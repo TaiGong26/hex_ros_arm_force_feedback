@@ -33,5 +33,11 @@ arm_force_feedback:
     grip_impedance_kp: [10.0]
     grip_impedance_kd: [0.5]
 
+    # gains used for slave arm follow control
+    arm_slave_follow_kp: [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
+    arm_slave_follow_kd: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+    grip_slave_follow_kp: [10.0]
+    grip_slave_follow_kd: [0.5]
+
     # max joint error [rad] to consider the stable position reached
     arrive_threshold: 0.06

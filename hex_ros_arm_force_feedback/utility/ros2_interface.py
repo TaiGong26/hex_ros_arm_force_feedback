@@ -46,6 +46,7 @@ from .interface_base import InterfaceBase
 
 _LETTERS = [chr(c) for c in range(ord('a'), ord('z') + 1)]
 
+from rclpy.logging import LoggingSeverity
 
 class DataInterface(InterfaceBase):
 
@@ -56,6 +57,7 @@ class DataInterface(InterfaceBase):
         rclpy.init()
         self.__node = rclpy.node.Node(name)
         self.__logger = self.__node.get_logger()
+        self.__logger.set_level(LoggingSeverity.DEBUG)
         self.__node.declare_parameter('rate_ros', 500.0)
         self._rate_param["ros"] = self.__node.get_parameter('rate_ros').value
         self.__rate = self.__node.create_rate(self._rate_param["ros"])
@@ -86,6 +88,11 @@ class DataInterface(InterfaceBase):
         self.__node.declare_parameter('arm_pos_threshold', 0.1)
         self.__node.declare_parameter('grip_impedance_kp', [10.0])
         self.__node.declare_parameter('grip_impedance_kd', [0.5])
+        self.__node.declare_parameter('arm_slave_follow_kp',
+                                      [0.0, 0.0, 0.0, 150.0, 100.0, 100.0])
+        self.__node.declare_parameter('arm_slave_follow_kd', [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])
+        self.__node.declare_parameter('grip_slave_follow_kp', [10.0])
+        self.__node.declare_parameter('grip_slave_follow_kd', [0.5])
         self.__node.declare_parameter('arrive_threshold', 0.06)
 
         self._rate_param.update({
@@ -127,6 +134,14 @@ class DataInterface(InterfaceBase):
             list(self.__node.get_parameter('grip_impedance_kp').value),
             "grip_impedance_kd":
             list(self.__node.get_parameter('grip_impedance_kd').value),
+            "arm_slave_follow_kp":
+            list(self.__node.get_parameter('arm_slave_follow_kp').value),
+            "arm_slave_follow_kd":
+            list(self.__node.get_parameter('arm_slave_follow_kd').value),
+            "grip_slave_follow_kp":
+            list(self.__node.get_parameter('grip_slave_follow_kp').value),
+            "grip_slave_follow_kd":
+            list(self.__node.get_parameter('grip_slave_follow_kd').value),
             "arrive_threshold":
             self.__node.get_parameter('arrive_threshold').value,
         }

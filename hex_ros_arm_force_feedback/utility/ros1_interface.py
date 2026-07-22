@@ -107,6 +107,18 @@ class DataInterface(InterfaceBase):
             list(rospy.get_param('~grip_impedance_kp', [10.0])),
             "grip_impedance_kd":
             list(rospy.get_param('~grip_impedance_kd', [0.5])),
+            "arm_slave_follow_kp":
+            list(
+                rospy.get_param('~arm_slave_follow_kp',
+                                [0.0, 0.0, 0.0, 150.0, 100.0, 100.0])),
+            "arm_slave_follow_kd":
+            list(
+                rospy.get_param('~arm_slave_follow_kd',
+                                [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])),
+            "grip_slave_follow_kp":
+            list(rospy.get_param('~grip_slave_follow_kp', [10.0])),
+            "grip_slave_follow_kd":
+            list(rospy.get_param('~grip_slave_follow_kd', [0.5])),
             "arrive_threshold":
             rospy.get_param('~arrive_threshold', 0.06),
         }

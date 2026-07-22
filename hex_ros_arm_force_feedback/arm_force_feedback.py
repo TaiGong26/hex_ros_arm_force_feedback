@@ -6,6 +6,7 @@
 # Date  : 2026-06-30
 ################################################################
 
+from doctest import master
 import os
 import sys
 import time
@@ -37,6 +38,7 @@ from hex_util_ros import HexDynUtilY6
 ARM_DOF = 6
 GRIP_DOF = 1
 
+EXTRA_MASS = 0.1
 
 class ArmForceFeedback:
 
@@ -63,7 +65,10 @@ class ArmForceFeedback:
                 self.__model_param["pose_end_in_flange"], dtype=np.float64),
             gravity=self.__gravity,
         )
-
+        
+        self.__extra_force = -self.__dyn_util.get_gravity(
+        ) * EXTRA_MASS
+        
         ### control presets
         self.__arm_start_pos = np.asarray(
             self.__force_feedback_param["arm_start_pos"], dtype=np.float64)
@@ -90,12 +95,25 @@ class ArmForceFeedback:
             self.__force_feedback_param["grip_impedance_kp"], dtype=np.float64)
         self.__grip_impedance_kd = np.asarray(
             self.__force_feedback_param["grip_impedance_kd"], dtype=np.float64)
+        
+        
+        self.__arm_slave_follow_kp = np.asarray(
+            self.__force_feedback_param["arm_slave_follow_kp"], dtype=np.float64)
+        self.__arm_slave_follow_kd = np.asarray(
+            self.__force_feedback_param["arm_slave_follow_kd"], dtype=np.float64)
+        self.__grip_slave_follow_kp = np.asarray(
+            self.__force_feedback_param["grip_slave_follow_kp"], dtype=np.float64)
+        self.__grip_slave_follow_kd = np.asarray(
+            self.__force_feedback_param["grip_slave_follow_kd"], dtype=np.float64)
         self.__arrive_threshold = self.__force_feedback_param["arrive_threshold"]
 
         ### threads
         self.__stop_event = threading.Event()
         self.__teleop_thread = threading.Thread(target=self.__teleop_process)
         self.__teleop_dt = 1.0 / max(float(self.__rate_param["teleop"]), 1.0)
+        
+        
+        self._logd = self.__data_interface.logd
 
     def __is_running(self):
         return self.__data_interface.ok() and not self.__stop_event.is_set()
@@ -153,8 +171,8 @@ class ArmForceFeedback:
                 eff=np.zeros(ARM_DOF),
                 kp=self.__arm_stable_kp.copy(),
                 kd=self.__arm_stable_kd.copy(),
-                lim_vel=1.0 * np.ones(ARM_DOF,dtype=np.float64),
-                lim_acc=100 * np.ones(ARM_DOF,dtype=np.float64),
+                lim_vel=10.0 * np.ones(ARM_DOF,dtype=np.float64),
+                lim_acc=10 * np.ones(ARM_DOF,dtype=np.float64),
             ),
             pose=self.__default_pose(),
         )
@@ -210,6 +228,82 @@ class ArmForceFeedback:
         )
         return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
 
+    def __build_follow_ctrl(
+            self,
+            arm_jnt_pos: np.ndarray = None,
+            grip_jnt_pos: np.ndarray = None) -> HexDcRoboManipCtrl:
+        arm_ctrl = HexDcRoboArmCtrl(
+            ctrl_mode=HexDcRoboArmCtrlMode.MIT,
+            grav=HexDcBaseVector3(
+                x=float(self.__gravity[0]),
+                y=float(self.__gravity[1]),
+                z=float(self.__gravity[2]),
+            ),
+            jnt=HexDcBaseJntFull(
+                pos=arm_jnt_pos
+                if arm_jnt_pos is not None else self.__arm_start_pos.copy(),
+                vel=np.zeros(ARM_DOF),
+                eff=np.zeros(ARM_DOF),
+                kp=self.__arm_slave_follow_kp.copy(),
+                kd=self.__arm_slave_follow_kd.copy(),
+                lim_vel=np.zeros(ARM_DOF),
+                lim_acc=np.zeros(ARM_DOF),
+            ),
+            pose=self.__default_pose(),
+        )
+        grip_ctrl = HexDcRoboGripCtrl(
+            ctrl_mode=HexDcRoboGripCtrlMode.MIT,
+            jnt=HexDcBaseJntFull(
+                pos=grip_jnt_pos
+                if grip_jnt_pos is not None else self.__grip_stable_pos.copy(),
+                vel=np.zeros(GRIP_DOF),
+                eff=np.zeros(GRIP_DOF),
+                kp=self.__grip_impedance_kp.copy(),
+                kd=self.__grip_impedance_kd.copy(),
+                lim_vel=np.zeros(GRIP_DOF),
+                lim_acc=np.zeros(GRIP_DOF),
+            ),
+        )
+        return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
+
+
+    def __build_comp_ctrl(self, extra_tau: np.ndarray) -> HexDcRoboManipCtrl:
+        # MIT mode with zero gains: the driver/sim adds the model gravity +
+        # coriolis compensation (via `grav`), so the only commanded effort is
+        # the torque that holds the extra end-effector payload.
+        arm_ctrl = HexDcRoboArmCtrl(
+            ctrl_mode=HexDcRoboArmCtrlMode.MIT,
+            grav=HexDcBaseVector3(
+                x=float(self.__gravity[0]),
+                y=float(self.__gravity[1]),
+                z=float(self.__gravity[2]),
+            ),
+            jnt=HexDcBaseJntFull(
+                pos=np.zeros(ARM_DOF),
+                vel=np.zeros(ARM_DOF),
+                eff=np.asarray(extra_tau, dtype=np.float64),
+                kp=np.zeros(ARM_DOF),
+                kd=np.zeros(ARM_DOF),
+                lim_vel=np.zeros(ARM_DOF),
+                lim_acc=np.zeros(ARM_DOF),
+            ),
+            pose=self.__default_pose(),
+        )
+        grip_ctrl = HexDcRoboGripCtrl(
+            ctrl_mode=HexDcRoboGripCtrlMode.MIT,
+            jnt=HexDcBaseJntFull(
+                pos=np.zeros(GRIP_DOF),
+                vel=np.zeros(GRIP_DOF),
+                eff=np.zeros(GRIP_DOF),
+                kp=np.zeros(GRIP_DOF),
+                kd=np.zeros(GRIP_DOF),
+                lim_vel=np.zeros(GRIP_DOF),
+                lim_acc=np.zeros(GRIP_DOF),
+            ),
+        )
+        return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
+    
+    
     ##############################################################
     # Processes
     ##############################################################
@@ -285,33 +379,51 @@ class ArmForceFeedback:
 
     def __work_process(self):
         self.__data_interface.logi("[arm_force_feedback]: start impedance control")
-        # while self.__is_running():
-        #     state = self.__data_interface.get_manip_state(latest=True)
-        #     if state is not None:
-        #         pos = np.array([
-        #             state.manip_state.arm_state.pose.position.x,
-        #             state.manip_state.arm_state.pose.position.y,
-        #             state.manip_state.arm_state.pose.position.z
-        #         ])
+        while self.__is_running():
+            
+            # self.__follow_test()
 
-        #         pos_err = self.__arm_start_pose[0] - pos
-        #         max_err = np.max(np.abs(pos_err))
-        #         ratio = 1.0 if max_err < self.__arm_pos_threshold else self.__arm_pos_threshold / max_err
-        #         pos_err = pos_err * ratio
-        #         tar_pos = pos + pos_err
 
-        #         ik_success, tar_jnt_pos = self.__dyn_util.inverse_kinematics_analytic(
-        #             (tar_pos, self.__arm_start_pose[1]),
-        #             state.manip_state.arm_state.jnt.position)
-        #         if not ik_success:
-        #             tar_jnt_pos = state.manip_state.arm_state.jnt.position
-        #             print(f"[arm_force_feedback]: inverse kinematics failed")
+            self.__feedbcak_test()
+            self.__data_interface.sleep()
+
+    def __follow_test(self):
+        master_state = self.__data_interface.get_master_manip_state(latest=True)
+        slave_state = self.__data_interface.get_slave_manip_state(latest=True)
+
+        master_q = None
+        
+        extra_tau = np.zeros(ARM_DOF)
+        
+        ### master
+        if master_state is not None:
+            master_q = np.asarray(master_state.manip_state.arm_state.jnt.position,
+                            dtype=np.float64)
+        
+        # self._logd(f"slave state {slave_state} master_q{master_q } ,slave_q{slave_q}")
+        
+        if extra_tau is not None:
+            self.__data_interface.pub_master_manip_ctrl(
+                    self.__build_comp_ctrl(extra_tau))
+        
+        if master_q is not None:
+            
+            self.__data_interface.pub_slave_manip_ctrl(
+                self.__build_follow_ctrl(master_q))
+    
+    def __feedbcak_test(self):
                     
-        #         # self.__data_interface.pub_manip_ctrl(
-        #         #     self.__build_impedance_ctrl(tar_jnt_pos))
-        #     self.__data_interface.sleep()
+            master_state = self.__data_interface.get_master_manip_state(latest=True)
+            slave_state = self.__data_interface.get_slave_manip_state(latest=True)
 
-
+            master_q = None
+            master_dq = None
+            
+            slave_q = None
+            slave_dq = None
+            
+            
+    
 def main():
     arm_force_feedback = ArmForceFeedback()
     try:
