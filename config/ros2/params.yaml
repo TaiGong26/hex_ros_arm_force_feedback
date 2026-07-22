@@ -1,4 +1,4 @@
-arm_impedance:
+arm_force_feedback:
   ros__parameters:
     # impedance control work loop rate [hz]
     rate_ros: 500.0
@@ -21,10 +21,10 @@ arm_impedance:
     grip_stable_pos: [0.5]
 
     # gains used while moving to the stable position
-    arm_kp: [200.0, 200.0, 250.0, 150.0, 100.0, 100.0]
-    arm_kd: [5.0, 5.0, 5.0, 5.0, 2.0, 2.0]
-    grip_kp: [10.0]
-    grip_kd: [0.5]
+    arm_stable_kp: [200.0, 200.0, 250.0, 150.0, 100.0, 100.0]
+    arm_stable_kd: [5.0, 5.0, 5.0, 5.0, 2.0, 2.0]
+    grip_stable_kp: [10.0]
+    grip_stable_kd: [0.5]
 
     # gains used while use impedance control
     arm_impedance_kp: [0.0, 0.0, 0.0, 150.0, 100.0, 100.0]

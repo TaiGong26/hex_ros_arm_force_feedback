@@ -21,5 +21,5 @@
     <include file="$(find hex_ros_teleop_keyboard)/launch/ros1/teleop_keyboard.launch"/>
 
     <!-- impedance control node -->
-    <include file="$(find hex_ros_arm_force_feedback)/launch/ros1/arm_impedance.launch"/>
+    <include file="$(find hex_ros_arm_force_feedback)/launch/ros1/arm_force_feedback.launch"/>
 </launch>

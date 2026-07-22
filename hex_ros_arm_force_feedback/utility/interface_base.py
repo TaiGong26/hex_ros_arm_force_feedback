@@ -21,10 +21,12 @@ class InterfaceBase(ABC):
         ### ros parameters
         self._rate_param = {}
         self._model_param = {}
-        self._impedance_param = {}
+        self._force_feedback_param = {}
 
         ### rx msg queues
         self._manip_state_deque = deque(maxlen=100)
+        self._master_manip_state_deque = deque(maxlen=100)
+        self._slave_manip_state_deque = deque(maxlen=100)
         self._keyboard_deque = deque(maxlen=100)
 
         ### name
@@ -81,15 +83,20 @@ class InterfaceBase(ABC):
     def get_model_param(self) -> dict:
         return self._model_param
 
-    def get_impedance_param(self) -> dict:
-        return self._impedance_param
+    def get_force_feedback_param(self) -> dict:
+        return self._force_feedback_param
 
     ####################
     ### publishers
     ####################
+
     @abstractmethod
-    def pub_manip_ctrl(self, out: HexDcRoboManipCtrl):
-        raise NotImplementedError("InterfaceBase.pub_manip_ctrl")
+    def pub_master_manip_ctrl(self, out: HexDcRoboManipCtrl):
+        raise NotImplementedError("InterfaceBase.pub_master_manip_ctrl")
+
+    @abstractmethod
+    def pub_slave_manip_ctrl(self, out: HexDcRoboManipCtrl):
+        raise NotImplementedError("InterfaceBase.pub_slave_manip_ctrl")
 
     ####################
     ### subscribers
@@ -110,11 +117,20 @@ class InterfaceBase(ABC):
                 return None
 
     # manip state
-    def get_manip_state(
+
+    # master manip state
+    def get_master_manip_state(
         self,
         latest: bool = False,
     ) -> Optional[HexDcRoboManipStateStamped]:
-        return self.deque_helper(self._manip_state_deque, latest)
+        return self.deque_helper(self._master_manip_state_deque, latest)
+
+    # slave manip state
+    def get_slave_manip_state(
+        self,
+        latest: bool = False,
+    ) -> Optional[HexDcRoboManipStateStamped]:
+        return self.deque_helper(self._slave_manip_state_deque, latest)
 
     # keyboard state
     def get_keyboard_state(

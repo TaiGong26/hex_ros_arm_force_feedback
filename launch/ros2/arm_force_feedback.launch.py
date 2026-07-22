@@ -14,35 +14,37 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    impedance_pkg_path = FindPackageShare('hex_ros_arm_force_feedback')
+    force_feedback_pkg_path = FindPackageShare('hex_ros_arm_force_feedback')
     urdf_pkg_path = FindPackageShare('hex_ros_urdf_archer_y6')
 
-    # arm_impedance node
-    impedance_param_path = PathJoinSubstitution(
-        [impedance_pkg_path, "config", "ros2", "params.yaml"])
+    # arm_force_feedback node
+    force_feedback_param_path = PathJoinSubstitution(
+        [force_feedback_pkg_path, "config", "ros2", "params.yaml"])
     urdf_file_path = PathJoinSubstitution(
         [urdf_pkg_path, "urdf", "gr100_comp.urdf"])
 
-    arm_impedance_node = Node(
+    arm_force_feedback_node = Node(
         package='hex_ros_arm_force_feedback',
-        executable='arm_impedance',
-        name='arm_impedance',
+        executable='arm_force_feedback',
+        name='arm_force_feedback',
         output="screen",
         emulate_tty=True,
         parameters=[
-            impedance_param_path,
+            force_feedback_param_path,
             {
                 "model_urdf": ParameterValue(urdf_file_path, value_type=str),
                 "use_sim_time": True,
             },
         ],
         remappings=[
-            ('manip_state', 'manip_state'),
-            ('manip_ctrl', 'manip_ctrl'),
+            ('master/manip_state', 'master/manip_state'),
+            ('master/manip_ctrl', 'master/manip_ctrl'),
+            ('slave/manip_state', 'slave/manip_state'),
+            ('slave/manip_ctrl', 'slave/manip_ctrl'),
             ('teleop_keyboard_state', 'teleop_keyboard_state'),
         ],
     )
 
     return LaunchDescription([
-        arm_impedance_node,
+        arm_force_feedback_node,
     ])

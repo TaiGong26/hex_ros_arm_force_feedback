@@ -70,7 +70,7 @@ class DataInterface(InterfaceBase):
                 rospy.get_param('~pose_end_in_flange',
                                 [0.187, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0])),
         }
-        self._impedance_param = {
+        self._force_feedback_param = {
             "gravity":
             list(rospy.get_param('~gravity', [0.0, 0.0, -9.81])),
             "arm_start_pos":
@@ -83,16 +83,16 @@ class DataInterface(InterfaceBase):
                                 [0.0, -1.5, 3.0, 0.07, 0.0, 0.0])),
             "grip_stable_pos":
             list(rospy.get_param('~grip_stable_pos', [0.5])),
-            "arm_kp":
+            "arm_stable_kp":
             list(
-                rospy.get_param('~arm_kp',
+                rospy.get_param('~arm_stable_kp',
                                 [200.0, 200.0, 250.0, 150.0, 100.0, 100.0])),
-            "arm_kd":
-            list(rospy.get_param('~arm_kd', [5.0, 5.0, 5.0, 5.0, 2.0, 2.0])),
-            "grip_kp":
-            list(rospy.get_param('~grip_kp', [10.0])),
-            "grip_kd":
-            list(rospy.get_param('~grip_kd', [0.5])),
+            "arm_stable_kd":
+            list(rospy.get_param('~arm_stable_kd', [5.0, 5.0, 5.0, 5.0, 2.0, 2.0])),
+            "grip_stable_kp":
+            list(rospy.get_param('~grip_stable_kp', [10.0])),
+            "grip_stable_kd":
+            list(rospy.get_param('~grip_stable_kd', [0.5])),
             "arm_impedance_kp":
             list(
                 rospy.get_param('~arm_impedance_kp',
@@ -112,8 +112,14 @@ class DataInterface(InterfaceBase):
         }
 
         ### publisher
-        self.__manip_ctrl_pub = rospy.Publisher(
-            'manip_ctrl',
+
+        self.__master_manip_ctrl_pub = rospy.Publisher(
+            'master/manip_ctrl',
+            HexRosRoboManipCtrlStamped,
+            queue_size=10,
+        )
+        self.__slave_manip_ctrl_pub = rospy.Publisher(
+            'slave/manip_ctrl',
             HexRosRoboManipCtrlStamped,
             queue_size=10,
         )
@@ -131,6 +137,20 @@ class DataInterface(InterfaceBase):
         )
         self.__manip_state_sub
         self.__keyboard_sub
+
+        ### master/slave subscriber
+        self.__master_manip_state_sub = rospy.Subscriber(
+            'master/manip_state',
+            HexRosRoboManipStateStamped,
+            self.__master_manip_state_callback,
+        )
+        self.__slave_manip_state_sub = rospy.Subscriber(
+            'slave/manip_state',
+            HexRosRoboManipStateStamped,
+            self.__slave_manip_state_callback,
+        )
+        self.__master_manip_state_sub
+        self.__slave_manip_state_sub
 
         ### finish log
         print(f"#### DataInterface init: {self._name} ####")
@@ -165,14 +185,24 @@ class DataInterface(InterfaceBase):
     ####################
     ### publishers
     ####################
-    def pub_manip_ctrl(self, out: HexDcRoboManipCtrl):
+
+    def pub_master_manip_ctrl(self, out: HexDcRoboManipCtrl):
         msg = HexRosRoboManipCtrlStamped()
         msg.header.stamp = rospy.Time.now()
         msg.manip_ctrl = HexRosRoboManipCtrl(
             arm_ctrl=self.__arm_ctrl_to_msg(out.arm_ctrl),
             grip_ctrl=self.__grip_ctrl_to_msg(out.grip_ctrl),
         )
-        self.__manip_ctrl_pub.publish(msg)
+        self.__master_manip_ctrl_pub.publish(msg)
+
+    def pub_slave_manip_ctrl(self, out: HexDcRoboManipCtrl):
+        msg = HexRosRoboManipCtrlStamped()
+        msg.header.stamp = rospy.Time.now()
+        msg.manip_ctrl = HexRosRoboManipCtrl(
+            arm_ctrl=self.__arm_ctrl_to_msg(out.arm_ctrl),
+            grip_ctrl=self.__grip_ctrl_to_msg(out.grip_ctrl),
+        )
+        self.__slave_manip_ctrl_pub.publish(msg)
 
     @staticmethod
     def __jnt_to_msg(jnt) -> HexRosJnt:
@@ -222,6 +252,17 @@ class DataInterface(InterfaceBase):
 
     def __keyboard_callback(self, msg: HexRosTeleopKeyboardStateStamped):
         self._keyboard_deque.append(self.__keyboard_msg_to_dc(msg))
+
+    ####################
+    ### master/slave callbacks
+    ####################
+    def __master_manip_state_callback(self, msg: HexRosRoboManipStateStamped):
+        self._master_manip_state_deque.append(
+            self.__manip_state_msg_to_dc(msg))
+
+    def __slave_manip_state_callback(self, msg: HexRosRoboManipStateStamped):
+        self._slave_manip_state_deque.append(
+            self.__manip_state_msg_to_dc(msg))
 
     @staticmethod
     def __keyboard_msg_to_dc(

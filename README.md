@@ -132,18 +132,18 @@ Ensure the following software is installed:
    ros2 launch hex_ros_teleop_keyboard teleop_keyboard.launch.py
    ```
 
-2. Launch the `arm_impedance` node:
+2. Launch the `arm_force_feedback` node:
 
    For ROS 1:
 
    ```shell
-   roslaunch hex_ros_arm_force_feedback arm_impedance.launch
+   roslaunch hex_ros_arm_force_feedback arm_force_feedback.launch
    ```
 
    For ROS 2:
 
    ```shell
-   ros2 launch hex_ros_arm_force_feedback arm_impedance.launch.py
+   ros2 launch hex_ros_arm_force_feedback arm_force_feedback.launch.py
    ```
 
 3. The arm moves to the stable pose and then enters impedance control. Press `q` to exit. To record data, use ROS's bag tools, e.g. `ros2 bag record -a`.

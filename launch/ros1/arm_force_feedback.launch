@@ -6,7 +6,7 @@
 <!--#######################################-->
 
 <launch>
-    <node name="arm_impedance" pkg="hex_ros_arm_force_feedback" type="arm_impedance.py" output="screen">
+    <node name="arm_force_feedback" pkg="hex_ros_arm_force_feedback" type="arm_force_feedback.py" output="screen">
         <!-- load default parameters -->
         <rosparam file="$(find hex_ros_arm_force_feedback)/config/ros1/params.yaml"/>
         <!-- robot model used for dynamics -->

@@ -74,11 +74,11 @@ class DataInterface(InterfaceBase):
         self.__node.declare_parameter('arm_end_pos',
                                       [0.0, -1.5, 3.0, 0.07, 0.0, 0.0])
         self.__node.declare_parameter('grip_stable_pos', [0.5])
-        self.__node.declare_parameter('arm_kp',
+        self.__node.declare_parameter('arm_stable_kp',
                                       [200.0, 200.0, 250.0, 150.0, 100.0, 100.0])
-        self.__node.declare_parameter('arm_kd', [5.0, 5.0, 5.0, 5.0, 2.0, 2.0])
-        self.__node.declare_parameter('grip_kp', [10.0])
-        self.__node.declare_parameter('grip_kd', [0.5])
+        self.__node.declare_parameter('arm_stable_kd', [5.0, 5.0, 5.0, 5.0, 2.0, 2.0])
+        self.__node.declare_parameter('grip_stable_kp', [10.0])
+        self.__node.declare_parameter('grip_stable_kd', [0.5])
         self.__node.declare_parameter('arm_impedance_kp',
                                       [100.0, 100.0, 125.0, 75.0, 50.0, 50.0])
         self.__node.declare_parameter('arm_impedance_kd',
@@ -100,7 +100,7 @@ class DataInterface(InterfaceBase):
             "pose_end_in_flange":
             list(self.__node.get_parameter('pose_end_in_flange').value),
         }
-        self._impedance_param = {
+        self._force_feedback_param = {
             "gravity":
             list(self.__node.get_parameter('gravity').value),
             "arm_start_pos":
@@ -109,14 +109,14 @@ class DataInterface(InterfaceBase):
             list(self.__node.get_parameter('arm_end_pos').value),
             "grip_stable_pos":
             list(self.__node.get_parameter('grip_stable_pos').value),
-            "arm_kp":
-            list(self.__node.get_parameter('arm_kp').value),
-            "arm_kd":
-            list(self.__node.get_parameter('arm_kd').value),
-            "grip_kp":
-            list(self.__node.get_parameter('grip_kp').value),
-            "grip_kd":
-            list(self.__node.get_parameter('grip_kd').value),
+            "arm_stable_kp":
+            list(self.__node.get_parameter('arm_stable_kp').value),
+            "arm_stable_kd":
+            list(self.__node.get_parameter('arm_stable_kd').value),
+            "grip_stable_kp":
+            list(self.__node.get_parameter('grip_stable_kp').value),
+            "grip_stable_kd":
+            list(self.__node.get_parameter('grip_stable_kd').value),
             "arm_impedance_kp":
             list(self.__node.get_parameter('arm_impedance_kp').value),
             "arm_impedance_kd":
@@ -132,9 +132,14 @@ class DataInterface(InterfaceBase):
         }
 
         ### publisher
-        self.__manip_ctrl_pub = self.__node.create_publisher(
+        self.__master_manip_ctrl_pub = self.__node.create_publisher(
             HexRosRoboManipCtrlStamped,
-            'manip_ctrl',
+            'master/manip_ctrl',
+            10,
+        )
+        self.__slave_manip_ctrl_pub = self.__node.create_publisher(
+            HexRosRoboManipCtrlStamped,
+            'slave/manip_ctrl',
             10,
         )
 
@@ -153,6 +158,22 @@ class DataInterface(InterfaceBase):
         )
         self.__manip_state_sub
         self.__keyboard_sub
+
+        ### master/slave subscriber
+        self.__master_manip_state_sub = self.__node.create_subscription(
+            HexRosRoboManipStateStamped,
+            'master/manip_state',
+            self.__master_manip_state_callback,
+            10,
+        )
+        self.__slave_manip_state_sub = self.__node.create_subscription(
+            HexRosRoboManipStateStamped,
+            'slave/manip_state',
+            self.__slave_manip_state_callback,
+            10,
+        )
+        self.__master_manip_state_sub
+        self.__slave_manip_state_sub
 
         ### spin thread
         self.__shutting_down = False
@@ -209,14 +230,24 @@ class DataInterface(InterfaceBase):
     ####################
     ### publishers
     ####################
-    def pub_manip_ctrl(self, out: HexDcRoboManipCtrl):
+
+    def pub_master_manip_ctrl(self, out: HexDcRoboManipCtrl):
         msg = HexRosRoboManipCtrlStamped()
         msg.header.stamp = self.__node.get_clock().now().to_msg()
         msg.manip_ctrl = HexRosRoboManipCtrl(
             arm_ctrl=self.__arm_ctrl_to_msg(out.arm_ctrl),
             grip_ctrl=self.__grip_ctrl_to_msg(out.grip_ctrl),
         )
-        self.__manip_ctrl_pub.publish(msg)
+        self.__master_manip_ctrl_pub.publish(msg)
+
+    def pub_slave_manip_ctrl(self, out: HexDcRoboManipCtrl):
+        msg = HexRosRoboManipCtrlStamped()
+        msg.header.stamp = self.__node.get_clock().now().to_msg()
+        msg.manip_ctrl = HexRosRoboManipCtrl(
+            arm_ctrl=self.__arm_ctrl_to_msg(out.arm_ctrl),
+            grip_ctrl=self.__grip_ctrl_to_msg(out.grip_ctrl),
+        )
+        self.__slave_manip_ctrl_pub.publish(msg)
 
     @staticmethod
     def __jnt_to_msg(jnt) -> HexRosJnt:
@@ -266,6 +297,17 @@ class DataInterface(InterfaceBase):
 
     def __keyboard_callback(self, msg: HexRosTeleopKeyboardStateStamped):
         self._keyboard_deque.append(self.__keyboard_msg_to_dc(msg))
+
+    ####################
+    ### master/slave callbacks
+    ####################
+    def __master_manip_state_callback(self, msg: HexRosRoboManipStateStamped):
+        self._master_manip_state_deque.append(
+            self.__manip_state_msg_to_dc(msg))
+
+    def __slave_manip_state_callback(self, msg: HexRosRoboManipStateStamped):
+        self._slave_manip_state_deque.append(
+            self.__manip_state_msg_to_dc(msg))
 
     @staticmethod
     def __keyboard_msg_to_dc(

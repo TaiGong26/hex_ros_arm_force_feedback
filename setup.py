@@ -38,7 +38,7 @@ setup(
     license='Apache-2.0',
     entry_points={
         'console_scripts': [
-            'arm_impedance = hex_ros_arm_force_feedback.arm_impedance:main',
+            'arm_force_feedback = hex_ros_arm_force_feedback.arm_force_feedback:main',
         ],
     },
 )
