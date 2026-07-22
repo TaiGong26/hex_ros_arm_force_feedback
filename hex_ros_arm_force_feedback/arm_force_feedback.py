@@ -12,12 +12,14 @@ import sys
 import time
 import traceback
 import threading
+from typing import Optional
 
 import numpy as np
 from hex_util_ros import part2se3, se32part
 
 scrpit_path = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(scrpit_path)
+from sympy import false
 from utility import DataInterface
 
 from hex_util_msg.dataclass.dataclass_base import (
@@ -112,6 +114,7 @@ class ArmForceFeedback:
         self.__teleop_thread = threading.Thread(target=self.__teleop_process)
         self.__teleop_dt = 1.0 / max(float(self.__rate_param["teleop"]), 1.0)
         
+        self.__motor_cnt = 6
         
         self._logd = self.__data_interface.logd
 
@@ -190,48 +193,11 @@ class ArmForceFeedback:
         )
         return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
 
-    def __build_impedance_ctrl(
-            self,
-            arm_jnt_pos: np.ndarray = None,
-            grip_jnt_pos: np.ndarray = None) -> HexDcRoboManipCtrl:
-        arm_ctrl = HexDcRoboArmCtrl(
-            ctrl_mode=HexDcRoboArmCtrlMode.MIT,
-            grav=HexDcBaseVector3(
-                x=float(self.__gravity[0]),
-                y=float(self.__gravity[1]),
-                z=float(self.__gravity[2]),
-            ),
-            jnt=HexDcBaseJntFull(
-                pos=arm_jnt_pos
-                if arm_jnt_pos is not None else self.__arm_start_pos.copy(),
-                vel=np.zeros(ARM_DOF),
-                eff=np.zeros(ARM_DOF),
-                kp=self.__arm_impedance_kp.copy(),
-                kd=self.__arm_impedance_kd.copy(),
-                lim_vel=np.zeros(ARM_DOF),
-                lim_acc=np.zeros(ARM_DOF),
-            ),
-            pose=self.__default_pose(),
-        )
-        grip_ctrl = HexDcRoboGripCtrl(
-            ctrl_mode=HexDcRoboGripCtrlMode.MIT,
-            jnt=HexDcBaseJntFull(
-                pos=grip_jnt_pos
-                if grip_jnt_pos is not None else self.__grip_stable_pos.copy(),
-                vel=np.zeros(GRIP_DOF),
-                eff=np.zeros(GRIP_DOF),
-                kp=self.__grip_impedance_kp.copy(),
-                kd=self.__grip_impedance_kd.copy(),
-                lim_vel=np.zeros(GRIP_DOF),
-                lim_acc=np.zeros(GRIP_DOF),
-            ),
-        )
-        return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
-
     def __build_follow_ctrl(
             self,
-            arm_jnt_pos: np.ndarray = None,
-            grip_jnt_pos: np.ndarray = None) -> HexDcRoboManipCtrl:
+            arm_jnt_pos: Optional[np.ndarray] = None,
+            arm_jnt_eff: Optional[np.ndarray] = None,
+            grip_jnt_pos: Optional[np.ndarray] = None) -> HexDcRoboManipCtrl:
         arm_ctrl = HexDcRoboArmCtrl(
             ctrl_mode=HexDcRoboArmCtrlMode.MIT,
             grav=HexDcBaseVector3(
@@ -243,7 +209,7 @@ class ArmForceFeedback:
                 pos=arm_jnt_pos
                 if arm_jnt_pos is not None else self.__arm_start_pos.copy(),
                 vel=np.zeros(ARM_DOF),
-                eff=np.zeros(ARM_DOF),
+                eff= arm_jnt_eff if arm_jnt_eff is not None else np.zeros(ARM_DOF),
                 kp=self.__arm_slave_follow_kp.copy(),
                 kd=self.__arm_slave_follow_kd.copy(),
                 lim_vel=np.zeros(ARM_DOF),
@@ -266,8 +232,9 @@ class ArmForceFeedback:
         )
         return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
 
-
-    def __build_comp_ctrl(self, extra_tau: np.ndarray) -> HexDcRoboManipCtrl:
+    def __build_feedback_ctrl(self, 
+            arm_jnt_pos: Optional[np.ndarray] = None,
+            arm_jnt_eff: Optional[np.ndarray] = None,) -> HexDcRoboManipCtrl:
         # MIT mode with zero gains: the driver/sim adds the model gravity +
         # coriolis compensation (via `grav`), so the only commanded effort is
         # the torque that holds the extra end-effector payload.
@@ -279,9 +246,9 @@ class ArmForceFeedback:
                 z=float(self.__gravity[2]),
             ),
             jnt=HexDcBaseJntFull(
-                pos=np.zeros(ARM_DOF),
+                pos=  np.asarray(arm_jnt_pos, dtype=np.float64) if arm_jnt_pos is not None else np.zeros(ARM_DOF) ,
                 vel=np.zeros(ARM_DOF),
-                eff=np.asarray(extra_tau, dtype=np.float64),
+                eff=np.asarray(arm_jnt_eff, dtype=np.float64),
                 kp=np.zeros(ARM_DOF),
                 kd=np.zeros(ARM_DOF),
                 lim_vel=np.zeros(ARM_DOF),
@@ -302,6 +269,7 @@ class ArmForceFeedback:
             ),
         )
         return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
+    
     
     
     ##############################################################
@@ -379,49 +347,118 @@ class ArmForceFeedback:
 
     def __work_process(self):
         self.__data_interface.logi("[arm_force_feedback]: start impedance control")
-        while self.__is_running():
             
-            # self.__follow_test()
+        # self.__follow_test()
+        self.__feedbcak_test()
 
-
-            self.__feedbcak_test()
-            self.__data_interface.sleep()
 
     def __follow_test(self):
-        master_state = self.__data_interface.get_master_manip_state(latest=True)
-        slave_state = self.__data_interface.get_slave_manip_state(latest=True)
-
-        master_q = None
         
-        extra_tau = np.zeros(ARM_DOF)
+        while self.__is_running():
         
-        ### master
-        if master_state is not None:
-            master_q = np.asarray(master_state.manip_state.arm_state.jnt.position,
-                            dtype=np.float64)
-        
-        # self._logd(f"slave state {slave_state} master_q{master_q } ,slave_q{slave_q}")
-        
-        if extra_tau is not None:
-            self.__data_interface.pub_master_manip_ctrl(
-                    self.__build_comp_ctrl(extra_tau))
-        
-        if master_q is not None:
-            
-            self.__data_interface.pub_slave_manip_ctrl(
-                self.__build_follow_ctrl(master_q))
-    
-    def __feedbcak_test(self):
-                    
             master_state = self.__data_interface.get_master_manip_state(latest=True)
             slave_state = self.__data_interface.get_slave_manip_state(latest=True)
 
             master_q = None
-            master_dq = None
             
-            slave_q = None
-            slave_dq = None
+            extra_tau = np.zeros(ARM_DOF)
             
+            ### master
+            if master_state is not None:
+                master_q = np.asarray(master_state.manip_state.arm_state.jnt.position,
+                                dtype=np.float64)
+            
+            # self._logd(f"slave state {slave_state} master_q{master_q } ,slave_q{slave_q}")
+            
+            if extra_tau is not None:
+                self.__data_interface.pub_master_manip_ctrl(
+                        self.__build_feedback_ctrl(arm_jnt_eff=extra_tau))
+            
+            if master_q is not None:
+                
+                self.__data_interface.pub_slave_manip_ctrl(
+                    self.__build_follow_ctrl(master_q))
+                
+            self.__data_interface.sleep()
+            
+    
+    def __feedbcak_test(self):
+        
+        res_feedback=False
+        master_pos = None       
+        master_vel = None
+        
+        slave_pos = None
+        slave_vel = None
+        slave_eff = None
+
+        comp_weight = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+        comp_deadzone = np.array([7.0, 7.0, 7.0, 3.0, 2.0, 2.0])
+        
+        while self.__is_running():
+            master_state = self.__data_interface.get_master_manip_state(latest=True)
+            slave_state = self.__data_interface.get_slave_manip_state(latest=True)
+
+            master_cmd_eff = master_cmd_pos = None
+
+            ## master
+            if master_state is not None:
+                
+                # state
+                master_pos = np.asarray(master_state.manip_state.arm_state.jnt.position, dtype=np.float64)
+                master_vel = np.asarray(master_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
+                
+                _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(master_pos,master_vel)
+                
+                master_tau_comp =  c_mat @ master_vel + g_vec
+                
+                if res_feedback:
+                    master_tau_comp -= self.__deadzone(
+                        slave_res_eff,
+                        comp_deadzone,
+                    ) * comp_weight
+            
+                self.__data_interface.pub_master_manip_ctrl(
+                    self.__build_feedback_ctrl(master_pos,master_tau_comp))
+            
+            ## slave
+
+            if slave_state is not None:
+                slave_pos = np.asarray(slave_state.manip_state.arm_state.jnt.position, dtype=np.float64)
+                slave_vel = np.asarray(slave_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
+                slave_eff = np.asarray(slave_state.manip_state.arm_state.jnt.effort, dtype=np.float64)
+
+                _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(slave_pos, slave_vel)
+                
+                slave_tau_comp = c_mat @ slave_vel + g_vec
+
+                slave_res_eff = slave_eff.copy()
+                    
+                slave_res_eff -= slave_tau_comp
+                    
+                # slave_res_eff -= slave_tau_comp
+
+                if master_pos is not None:
+                    slave_res_q = slave_pos - master_pos
+                    if np.fabs(slave_res_q).max() < 0.5 and not res_feedback:
+                        res_feedback = True
+                    
+                    # cmd_pos , cmd_eff = cmds
+                    self.__data_interface.pub_slave_manip_ctrl(
+                        self.__build_follow_ctrl(master_pos,slave_tau_comp))
+                    
+                    
+                    # hexarm_slave_client.set_cmds(cmds)
+            
+    ##############################################################
+    # tools
+    ##############################################################
+    def __deadzone(self ,var, deadzone):
+        res = var.copy()
+        zero_mask = np.fabs(res) < deadzone
+        res[zero_mask] = 0.0
+        res[~zero_mask] -= np.sign(res[~zero_mask]) * deadzone[~zero_mask]
+        return res
             
     
 def main():
