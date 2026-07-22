@@ -1,0 +1,20 @@
+<!--#######################################-->
+<!-- Copyright (c) 2026  Dong Zhaorui.     -->
+<!-- All rights reserved.                  -->
+<!-- Author: Dong Zhaorui 847235539@qq.com -->
+<!-- Date  : 2026-06-30                    -->
+<!--#######################################-->
+
+<launch>
+    <node name="arm_impedance" pkg="hex_ros_arm_force_feedback" type="arm_impedance.py" output="screen">
+        <!-- load default parameters -->
+        <rosparam file="$(find hex_ros_arm_force_feedback)/config/ros1/params.yaml"/>
+        <!-- robot model used for dynamics -->
+        <param name="model_urdf" value="$(find hex_ros_urdf_archer_y6)/urdf/gr100_comp.urdf"/>
+        <!-- subscribe -->
+        <remap from="manip_state" to="manip_state"/>
+        <remap from="teleop_keyboard_state" to="teleop_keyboard_state"/>
+        <!-- publish -->
+        <remap from="manip_ctrl" to="manip_ctrl"/>
+    </node>
+</launch>

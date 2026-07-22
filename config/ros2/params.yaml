@@ -1,0 +1,37 @@
+arm_impedance:
+  ros__parameters:
+    # impedance control work loop rate [hz]
+    rate_ros: 500.0
+
+    # keyboard monitor rate [hz]
+    rate_teleop: 100.0
+
+    # robot model (urdf used for dynamics, set by launch)
+    model_urdf: ""
+    model_frame_id: "base_link"
+    # end effector pose in flange frame [x, y, z, qw, qx, qy, qz]
+    pose_end_in_flange: [0.187, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]
+
+    # gravity vector [m/s^2]
+    gravity: [0.0, 0.0, -9.81]
+
+    # stable (init / exit) joint position
+    arm_start_pos: [0.0, 0.1, 2.54, -1.07, 0.0, 0.0]
+    arm_end_pos: [0.0, -1.5, 3.0, 0.07, 0.0, 0.0]
+    grip_stable_pos: [0.5]
+
+    # gains used while moving to the stable position
+    arm_kp: [200.0, 200.0, 250.0, 150.0, 100.0, 100.0]
+    arm_kd: [5.0, 5.0, 5.0, 5.0, 2.0, 2.0]
+    grip_kp: [10.0]
+    grip_kd: [0.5]
+
+    # gains used while use impedance control
+    arm_impedance_kp: [0.0, 0.0, 0.0, 150.0, 100.0, 100.0]
+    arm_impedance_kd: [0.0, 0.0, 0.0, 5.0, 2.0, 2.0]
+    arm_pos_threshold: 0.015
+    grip_impedance_kp: [10.0]
+    grip_impedance_kd: [0.5]
+
+    # max joint error [rad] to consider the stable position reached
+    arrive_threshold: 0.06
