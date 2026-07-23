@@ -107,6 +107,10 @@ class ArmForceFeedback:
         self.__grip_slave_kd = np.asarray(
             self.__force_feedback_param["grip_slave_kd"], dtype=np.float64)
         self.__arrive_threshold = self.__force_feedback_param["arrive_threshold"]
+        self.__feedback_scale = np.asarray(
+            self.__force_feedback_param["feedback_scale"], dtype=np.float64)
+        self.__feedback_deadzone = np.asarray(
+            self.__force_feedback_param["feedback_deadzone"], dtype=np.float64)
 
         ### threads
         self.__stop_event = threading.Event()
@@ -367,8 +371,6 @@ class ArmForceFeedback:
                 master_q = np.asarray(master_state.manip_state.arm_state.jnt.position,
                                 dtype=np.float64)
             
-            # self._logd(f"slave state {slave_state} master_q{master_q } ,slave_q{slave_q}")
-            
             if extra_tau is not None:
                 self.__data_interface.pub_master_manip_ctrl(
                         self.__build_feedback_ctrl(arm_jnt_eff=extra_tau))
@@ -391,10 +393,10 @@ class ArmForceFeedback:
         slave_vel = None
         slave_eff = None
         
-        master_tau_comp = slave_tau_comp = None
+        master_tau = slave_tau_comp = None
 
-        comp_weight = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
-        comp_deadzone = np.array([7.0, 7.0, 7.0, 3.0, 2.0, 2.0])
+        feedback_scale = self.__feedback_scale.copy()
+        feedback_deadzone = self.__feedback_deadzone.copy()
         
         while self.__is_running():
             master_state = self.__data_interface.get_master_manip_state(latest=True)
@@ -409,18 +411,17 @@ class ArmForceFeedback:
                 
                 _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(master_pos,master_vel)
                                 
-                master_tau_comp =  c_mat @ master_vel
+                master_tau =  c_mat @ master_vel
                 
-                # self._logd(f"master err{master_tau_comp}, g_vec -> {g_vec}")
                 
                 if res_feedback:
-                    master_tau_comp -= self.__deadzone(
+                    master_tau -= self.__deadzone(
                         slave_res_eff,
-                        comp_deadzone,
-                    ) * comp_weight
+                        feedback_deadzone,
+                    ) * feedback_scale
             
                 self.__data_interface.pub_master_manip_ctrl(
-                    self.__build_feedback_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=master_tau_comp))
+                    self.__build_feedback_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=master_tau))
             
             ## slave
 
@@ -448,9 +449,9 @@ class ArmForceFeedback:
                     self.__data_interface.pub_slave_manip_ctrl(
                         self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=slave_tau_comp))
                 
-                if master_tau_comp is not None and slave_tau_comp is not None:
-                    self._logd(f"master_eff{master_tau_comp} slave_eff{slave_tau_comp}")
-                    
+                if master_tau is not None and slave_tau_comp is not None:
+                    self._logd(f"master_eff{master_tau} slave_eff{slave_tau_comp}")
+
             
     ##############################################################
     # tools

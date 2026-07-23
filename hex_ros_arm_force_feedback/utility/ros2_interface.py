@@ -94,6 +94,10 @@ class DataInterface(InterfaceBase):
         self.__node.declare_parameter('grip_slave_kp', [10.0])
         self.__node.declare_parameter('grip_slave_kd', [0.5])
         self.__node.declare_parameter('arrive_threshold', 0.06)
+        self.__node.declare_parameter('feedback_scale',
+                                      [0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
+        self.__node.declare_parameter('feedback_deadzone',
+                                      [7.0, 7.0, 7.0, 3.0, 2.0, 2.0])
 
         self._rate_param.update({
             "teleop":
@@ -144,6 +148,10 @@ class DataInterface(InterfaceBase):
             list(self.__node.get_parameter('grip_slave_kd').value),
             "arrive_threshold":
             self.__node.get_parameter('arrive_threshold').value,
+            "feedback_scale":
+            list(self.__node.get_parameter('feedback_scale').value),
+            "feedback_deadzone":
+            list(self.__node.get_parameter('feedback_deadzone').value),
         }
 
         ### publisher
