@@ -349,7 +349,7 @@ class ArmForceFeedback:
         self.__data_interface.logi("[arm_force_feedback]: start impedance control")
             
         # self.__follow_test()
-        self.__feedbcak_test()
+        self.__feedback_test()
 
 
     def __follow_test(self):
@@ -382,7 +382,7 @@ class ArmForceFeedback:
             self.__data_interface.sleep()
             
     
-    def __feedbcak_test(self):
+    def __feedback_test(self):
         
         res_feedback=False
         master_pos = None       
@@ -410,7 +410,11 @@ class ArmForceFeedback:
                 
                 _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(master_pos,master_vel)
                 
+                self._logd(f"c_mat{c_mat}, g_vec -> {g_vec}")
+                
                 master_tau_comp =  c_mat @ master_vel + g_vec
+                
+                self._logd(f"master err{master_tau_comp}, g_vec -> {g_vec}")
                 
                 if res_feedback:
                     master_tau_comp -= self.__deadzone(
@@ -419,7 +423,7 @@ class ArmForceFeedback:
                     ) * comp_weight
             
                 self.__data_interface.pub_master_manip_ctrl(
-                    self.__build_feedback_ctrl(master_pos,master_tau_comp))
+                    self.__build_feedback_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=master_tau_comp))
             
             ## slave
 
@@ -445,10 +449,10 @@ class ArmForceFeedback:
                     
                     # cmd_pos , cmd_eff = cmds
                     self.__data_interface.pub_slave_manip_ctrl(
-                        self.__build_follow_ctrl(master_pos,slave_tau_comp))
+                        self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=slave_tau_comp))
+                
+                self._logd("")
                     
-                    
-                    # hexarm_slave_client.set_cmds(cmds)
             
     ##############################################################
     # tools
