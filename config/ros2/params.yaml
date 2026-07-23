@@ -43,5 +43,5 @@ arm_force_feedback:
     arrive_threshold: 0.06
 
     # force feedback compensation: slave external force → master
-    feedback_scale: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
+    feedback_scale: [1.0, 1.0, 1.0, 0.5, 0.5, 0.5]
     feedback_deadzone: [7.0, 7.0, 7.0, 3.0, 2.0, 2.0]

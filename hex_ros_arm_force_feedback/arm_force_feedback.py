@@ -177,8 +177,8 @@ class ArmForceFeedback:
                 eff=np.zeros(ARM_DOF),
                 kp=self.__arm_stable_kp.copy(),
                 kd=self.__arm_stable_kd.copy(),
-                lim_vel=10.0 * np.ones(ARM_DOF,dtype=np.float64),
-                lim_acc=10 * np.ones(ARM_DOF,dtype=np.float64),
+                lim_vel=3.0 * np.ones(ARM_DOF,dtype=np.float64),
+                lim_acc=100 * np.ones(ARM_DOF,dtype=np.float64),
             ),
             pose=self.__default_pose(),
         )
@@ -354,7 +354,6 @@ class ArmForceFeedback:
         # self.__follow_test()
         self.__feedback_test()
 
-
     def __follow_test(self):
         
         while self.__is_running():
@@ -382,7 +381,6 @@ class ArmForceFeedback:
                 
             self.__data_interface.sleep()
             
-    
     def __feedback_test(self):
         
         res_feedback=False
@@ -393,7 +391,7 @@ class ArmForceFeedback:
         slave_vel = None
         slave_eff = None
         
-        master_tau = slave_tau_comp = None
+        master_tau = slave_tau = None
 
         feedback_scale = self.__feedback_scale.copy()
         feedback_deadzone = self.__feedback_deadzone.copy()
@@ -413,7 +411,6 @@ class ArmForceFeedback:
                                 
                 master_tau =  c_mat @ master_vel
                 
-                
                 if res_feedback:
                     master_tau -= self.__deadzone(
                         slave_res_eff,
@@ -432,25 +429,22 @@ class ArmForceFeedback:
 
                 _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(slave_pos, slave_vel)
                 
-                slave_tau_comp = c_mat @ slave_vel
+                slave_tau = c_mat @ slave_vel
 
                 slave_res_eff = slave_eff.copy()
                     
-                slave_res_eff -= slave_tau_comp
+                slave_res_eff -= slave_tau
                     
-                # slave_res_eff -= slave_tau_comp
-
                 if master_pos is not None:
                     slave_res_q = slave_pos - master_pos
                     if np.fabs(slave_res_q).max() < 0.5 and not res_feedback:
                         res_feedback = True
                     
-                    # cmd_pos , cmd_eff = cmds
                     self.__data_interface.pub_slave_manip_ctrl(
-                        self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=slave_tau_comp))
+                        self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=slave_tau))
                 
-                if master_tau is not None and slave_tau_comp is not None:
-                    self._logd(f"master_eff{master_tau} slave_eff{slave_tau_comp}")
+                if master_tau is not None and slave_tau is not None:
+                    self._logd(f"master_eff{master_tau} slave_eff{slave_tau}")
 
             
     ##############################################################
