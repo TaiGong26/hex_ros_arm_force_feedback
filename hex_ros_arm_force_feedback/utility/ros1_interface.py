@@ -93,8 +93,6 @@ class DataInterface(InterfaceBase):
             list(rospy.get_param('~grip_stable_kp', [10.0])),
             "grip_stable_kd":
             list(rospy.get_param('~grip_stable_kd', [0.5])),
-            "arm_pos_threshold":
-            rospy.get_param('~arm_pos_threshold', 0.1),
             "arm_master_kp":
             list(
                 rospy.get_param('~arm_master_kp',
@@ -119,8 +117,6 @@ class DataInterface(InterfaceBase):
             list(rospy.get_param('~grip_slave_kp', [10.0])),
             "grip_slave_kd":
             list(rospy.get_param('~grip_slave_kd', [0.5])),
-            "arrive_threshold":
-            rospy.get_param('~arrive_threshold', 0.06),
             "feedback_scale":
             list(
                 rospy.get_param('~feedback_scale',

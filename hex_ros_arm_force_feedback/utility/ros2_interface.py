@@ -81,7 +81,6 @@ class DataInterface(InterfaceBase):
         self.__node.declare_parameter('arm_stable_kd', [5.0, 5.0, 5.0, 5.0, 2.0, 2.0])
         self.__node.declare_parameter('grip_stable_kp', [10.0])
         self.__node.declare_parameter('grip_stable_kd', [0.5])
-        self.__node.declare_parameter('arm_pos_threshold', 0.1)
         self.__node.declare_parameter('arm_master_kp',
                                       [0.0, 0.0, 0.0, 150.0, 100.0, 100.0])
         self.__node.declare_parameter('arm_master_kd',
@@ -93,7 +92,6 @@ class DataInterface(InterfaceBase):
         self.__node.declare_parameter('arm_slave_kd', [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])
         self.__node.declare_parameter('grip_slave_kp', [10.0])
         self.__node.declare_parameter('grip_slave_kd', [0.5])
-        self.__node.declare_parameter('arrive_threshold', 0.06)
         self.__node.declare_parameter('feedback_scale',
                                       [0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
         self.__node.declare_parameter('feedback_deadzone',
@@ -128,8 +126,6 @@ class DataInterface(InterfaceBase):
             list(self.__node.get_parameter('grip_stable_kp').value),
             "grip_stable_kd":
             list(self.__node.get_parameter('grip_stable_kd').value),
-            "arm_pos_threshold":
-            self.__node.get_parameter('arm_pos_threshold').value,
             "arm_master_kp":
             list(self.__node.get_parameter('arm_master_kp').value),
             "arm_master_kd":
@@ -146,8 +142,6 @@ class DataInterface(InterfaceBase):
             list(self.__node.get_parameter('grip_slave_kp').value),
             "grip_slave_kd":
             list(self.__node.get_parameter('grip_slave_kd').value),
-            "arrive_threshold":
-            self.__node.get_parameter('arrive_threshold').value,
             "feedback_scale":
             list(self.__node.get_parameter('feedback_scale').value),
             "feedback_deadzone":

@@ -19,7 +19,7 @@ def generate_launch_description():
 
     # arm_force_feedback node
     force_feedback_param_path = PathJoinSubstitution(
-        [force_feedback_pkg_path, "config", "ros2", "params.yaml"])
+        [force_feedback_pkg_path, "config", "ros2", "arm_force_feedback.yaml"])
     urdf_file_path = PathJoinSubstitution(
         [urdf_pkg_path, "urdf", "gr100_comp.urdf"])
 

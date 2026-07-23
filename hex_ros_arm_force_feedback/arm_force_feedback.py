@@ -78,7 +78,6 @@ class ArmForceFeedback:
                                         dtype=np.float64)
         self.__arm_start_pose = self.__dyn_util.forward_kinematics(
             self.__arm_start_pos)[-1]
-        self.__arm_pos_threshold = self.__force_feedback_param["arm_pos_threshold"]
         self.__grip_stable_pos = np.asarray(
             self.__force_feedback_param["grip_stable_pos"], dtype=np.float64)
         self.__arm_stable_kp = np.asarray(self.__force_feedback_param["arm_stable_kp"],
@@ -106,7 +105,6 @@ class ArmForceFeedback:
             self.__force_feedback_param["grip_slave_kp"], dtype=np.float64)
         self.__grip_slave_kd = np.asarray(
             self.__force_feedback_param["grip_slave_kd"], dtype=np.float64)
-        self.__arrive_threshold = self.__force_feedback_param["arrive_threshold"]
         self.__feedback_scale = np.asarray(
             self.__force_feedback_param["feedback_scale"], dtype=np.float64)
         self.__feedback_deadzone = np.asarray(
@@ -298,7 +296,7 @@ class ArmForceFeedback:
         if jnt_pos.shape != target.shape:
             return False
         err = target - jnt_pos
-        return bool(np.fabs(err).max() < self.__arrive_threshold)
+        return bool(np.fabs(err).max() < 0.06)
 
     def __move_to_stable(self, phase: str, is_start: bool = True):
         self.__data_interface.logi(

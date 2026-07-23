@@ -27,7 +27,6 @@ grip_stable_kd: [0.5]
 # gains used for master feedback control
 arm_master_kp: [0.0, 0.0, 0.0, 150.0, 100.0, 100.0]
 arm_master_kd: [0.0, 0.0, 0.0, 5.0, 2.0, 2.0]
-arm_pos_threshold: 0.2
 grip_master_kp: [10.0]
 grip_master_kd: [0.5]
 
@@ -36,9 +35,6 @@ arm_slave_kp: [0.0, 0.0, 0.0, 150.0, 100.0, 100.0]
 arm_slave_kd: [0.0, 0.0, 0.0, 5.0, 2.0, 2.0]
 grip_slave_kp: [10.0]
 grip_slave_kd: [0.5]
-
-# max joint error [rad] to consider the stable position reached
-arrive_threshold: 0.06
 
 # force feedback compensation: slave external force → master
 feedback_scale: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
