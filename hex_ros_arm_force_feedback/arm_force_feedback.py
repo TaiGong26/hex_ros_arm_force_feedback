@@ -390,6 +390,8 @@ class ArmForceFeedback:
         slave_pos = None
         slave_vel = None
         slave_eff = None
+        
+        master_tau_comp = slave_tau_comp = None
 
         comp_weight = np.array([0.5, 0.5, 0.5, 0.5, 0.5, 0.5])
         comp_deadzone = np.array([7.0, 7.0, 7.0, 3.0, 2.0, 2.0])
@@ -397,8 +399,6 @@ class ArmForceFeedback:
         while self.__is_running():
             master_state = self.__data_interface.get_master_manip_state(latest=True)
             slave_state = self.__data_interface.get_slave_manip_state(latest=True)
-
-            master_cmd_eff = master_cmd_pos = None
 
             ## master
             if master_state is not None:
@@ -408,12 +408,10 @@ class ArmForceFeedback:
                 master_vel = np.asarray(master_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
                 
                 _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(master_pos,master_vel)
+                                
+                master_tau_comp =  c_mat @ master_vel
                 
-                self._logd(f"c_mat{c_mat}, g_vec -> {g_vec}")
-                
-                master_tau_comp =  c_mat @ master_vel + g_vec
-                
-                self._logd(f"master err{master_tau_comp}, g_vec -> {g_vec}")
+                # self._logd(f"master err{master_tau_comp}, g_vec -> {g_vec}")
                 
                 if res_feedback:
                     master_tau_comp -= self.__deadzone(
@@ -433,7 +431,7 @@ class ArmForceFeedback:
 
                 _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(slave_pos, slave_vel)
                 
-                slave_tau_comp = c_mat @ slave_vel + g_vec
+                slave_tau_comp = c_mat @ slave_vel
 
                 slave_res_eff = slave_eff.copy()
                     
@@ -450,7 +448,8 @@ class ArmForceFeedback:
                     self.__data_interface.pub_slave_manip_ctrl(
                         self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=slave_tau_comp))
                 
-                self._logd("")
+                if master_tau_comp is not None and slave_tau_comp is not None:
+                    self._logd(f"master_eff{master_tau_comp} slave_eff{slave_tau_comp}")
                     
             
     ##############################################################
