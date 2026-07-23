@@ -105,10 +105,6 @@ class ArmForceFeedback:
             self.__force_feedback_param["grip_slave_kp"], dtype=np.float64)
         self.__grip_slave_kd = np.asarray(
             self.__force_feedback_param["grip_slave_kd"], dtype=np.float64)
-        self.__feedback_scale = np.asarray(
-            self.__force_feedback_param["feedback_scale"], dtype=np.float64)
-        self.__feedback_deadzone = np.asarray(
-            self.__force_feedback_param["feedback_deadzone"], dtype=np.float64)
 
         ### threads
         self.__stop_event = threading.Event()
@@ -175,7 +171,7 @@ class ArmForceFeedback:
                 eff=np.zeros(ARM_DOF),
                 kp=self.__arm_stable_kp.copy(),
                 kd=self.__arm_stable_kd.copy(),
-                lim_vel=3.0 * np.ones(ARM_DOF,dtype=np.float64),
+                lim_vel=2.0 * np.ones(ARM_DOF,dtype=np.float64),
                 lim_acc=100 * np.ones(ARM_DOF,dtype=np.float64),
             ),
             pose=self.__default_pose(),
@@ -198,7 +194,10 @@ class ArmForceFeedback:
             self,
             arm_jnt_pos: Optional[np.ndarray] = None,
             arm_jnt_eff: Optional[np.ndarray] = None,
-            grip_jnt_pos: Optional[np.ndarray] = None) -> HexDcRoboManipCtrl:
+            arm_jnt_vel: Optional[np.ndarray] = None,
+            grip_jnt_pos: Optional[np.ndarray] = None,
+            grip_jnt_vel: Optional[np.ndarray] = None,
+            grip_jnt_eff: Optional[np.ndarray] = None) -> HexDcRoboManipCtrl:
         arm_ctrl = HexDcRoboArmCtrl(
             ctrl_mode=HexDcRoboArmCtrlMode.MIT,
             grav=HexDcBaseVector3(
@@ -207,10 +206,9 @@ class ArmForceFeedback:
                 z=float(self.__gravity[2]),
             ),
             jnt=HexDcBaseJntFull(
-                pos=arm_jnt_pos
-                if arm_jnt_pos is not None else self.__arm_start_pos.copy(),
-                vel=np.zeros(ARM_DOF),
-                eff= arm_jnt_eff if arm_jnt_eff is not None else np.zeros(ARM_DOF),
+                pos=arm_jnt_pos if arm_jnt_pos is not None else self.__arm_start_pos.copy(),
+                vel=arm_jnt_vel if arm_jnt_vel is not None else np.zeros(ARM_DOF),
+                eff=arm_jnt_eff if arm_jnt_eff is not None else np.zeros(ARM_DOF),
                 kp=self.__arm_slave_kp.copy(),
                 kd=self.__arm_slave_kd.copy(),
                 lim_vel=np.zeros(ARM_DOF),
@@ -223,8 +221,8 @@ class ArmForceFeedback:
             jnt=HexDcBaseJntFull(
                 pos=grip_jnt_pos
                 if grip_jnt_pos is not None else self.__grip_stable_pos.copy(),
-                vel=np.zeros(GRIP_DOF),
-                eff=np.zeros(GRIP_DOF),
+                vel=grip_jnt_vel if grip_jnt_vel is not None else np.zeros(GRIP_DOF),
+                eff=grip_jnt_eff if grip_jnt_eff is not None else np.zeros(GRIP_DOF),
                 kp=self.__grip_slave_kp.copy(),
                 kd=self.__grip_slave_kd.copy(),
                 lim_vel=np.zeros(GRIP_DOF),
@@ -233,9 +231,13 @@ class ArmForceFeedback:
         )
         return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
 
-    def __build_feedback_ctrl(self, 
+    def __build_feedback_ctrl(self,
             arm_jnt_pos: Optional[np.ndarray] = None,
-            arm_jnt_eff: Optional[np.ndarray] = None,) -> HexDcRoboManipCtrl:
+            arm_jnt_eff: Optional[np.ndarray] = None,
+            arm_jnt_vel: Optional[np.ndarray] = None,
+            grip_jnt_pos: Optional[np.ndarray] = None,
+            grip_jnt_vel: Optional[np.ndarray] = None,
+            grip_jnt_eff: Optional[np.ndarray] = None) -> HexDcRoboManipCtrl:
         # MIT mode with master-side PD gains: the driver/sim adds the model
         # gravity + coriolis compensation (via `grav`), so the commanded
         # effort combines PD feedback with the compensation torque.
@@ -247,9 +249,9 @@ class ArmForceFeedback:
                 z=float(self.__gravity[2]),
             ),
             jnt=HexDcBaseJntFull(
-                pos=  np.asarray(arm_jnt_pos, dtype=np.float64) if arm_jnt_pos is not None else np.zeros(ARM_DOF) ,
-                vel=np.zeros(ARM_DOF),
-                eff=np.asarray(arm_jnt_eff, dtype=np.float64),
+                pos=np.asarray(arm_jnt_pos, dtype=np.float64) if arm_jnt_pos is not None else np.zeros(ARM_DOF),
+                vel=np.asarray(arm_jnt_vel, dtype=np.float64)  if arm_jnt_vel is not None else np.zeros(ARM_DOF),
+                eff=np.asarray(arm_jnt_eff, dtype=np.float64)  if arm_jnt_eff is not None else np.zeros(ARM_DOF),
                 kp=self.__arm_master_kp.copy(),
                 kd=self.__arm_master_kd.copy(),
                 lim_vel=np.zeros(ARM_DOF),
@@ -260,9 +262,9 @@ class ArmForceFeedback:
         grip_ctrl = HexDcRoboGripCtrl(
             ctrl_mode=HexDcRoboGripCtrlMode.MIT,
             jnt=HexDcBaseJntFull(
-                pos=np.zeros(GRIP_DOF),
-                vel=np.zeros(GRIP_DOF),
-                eff=np.zeros(GRIP_DOF),
+                pos=grip_jnt_pos if grip_jnt_pos is not None else np.zeros(GRIP_DOF),
+                vel=grip_jnt_vel if grip_jnt_vel is not None else np.zeros(GRIP_DOF),
+                eff=grip_jnt_eff if grip_jnt_eff is not None else np.zeros(GRIP_DOF),
                 kp=self.__grip_master_kp.copy(),
                 kd=self.__grip_master_kd.copy(),
                 lim_vel=np.zeros(GRIP_DOF),
@@ -270,8 +272,6 @@ class ArmForceFeedback:
             ),
         )
         return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
-    
-    
     
     ##############################################################
     # Processes
@@ -387,13 +387,12 @@ class ArmForceFeedback:
         
         slave_pos = None
         slave_vel = None
-        slave_eff = None
         
-        master_tau = slave_tau = None
+        master_target_pos = slave_target_pos = None
 
-        feedback_scale = self.__feedback_scale.copy()
-        feedback_deadzone = self.__feedback_deadzone.copy()
-        
+        comp_deadzone =np.ones(6)*0.1
+
+
         while self.__is_running():
             master_state = self.__data_interface.get_master_manip_state(latest=True)
             slave_state = self.__data_interface.get_slave_manip_state(latest=True)
@@ -405,57 +404,58 @@ class ArmForceFeedback:
                 master_pos = np.asarray(master_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 master_vel = np.asarray(master_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
                 
-                _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(master_pos,master_vel)
-                                
-                master_tau =  c_mat @ master_vel
-                
-                if res_feedback:
-                    master_tau -= self.__deadzone(
-                        slave_res_eff,
-                        feedback_deadzone,
-                    ) * feedback_scale
-            
-                self.__data_interface.pub_master_manip_ctrl(
-                    self.__build_feedback_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=master_tau))
-            
-            ## slave
 
+            ## slave
             if slave_state is not None:
+                
                 slave_pos = np.asarray(slave_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 slave_vel = np.asarray(slave_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
-                slave_eff = np.asarray(slave_state.manip_state.arm_state.jnt.effort, dtype=np.float64)
-
-                _, c_mat, g_vec, _, _ = self.__dyn_util.dynamic_params(slave_pos, slave_vel)
                 
-                slave_tau = c_mat @ slave_vel
-
-                slave_res_eff = slave_eff.copy()
-                    
-                slave_res_eff -= slave_tau
-                    
-                if master_pos is not None:
-                    slave_res_q = slave_pos - master_pos
-                    if np.fabs(slave_res_q).max() < 0.5 and not res_feedback:
-                        res_feedback = True
-                    
-                    self.__data_interface.pub_slave_manip_ctrl(
-                        self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_eff=slave_tau))
+            
                 
-                if master_tau is not None and slave_tau is not None:
-                    self._logd(f"master_eff{master_tau} slave_eff{slave_tau}")
+            if master_pos is not None and slave_pos is not None:
+                
+                try:
+                    
+                    # deadzone compensation
+                    master_target_pos = self.deadzone(master_pos,slave_pos,comp_deadzone)
+            
+                    # TODO: 增加 slave的上界，不要给一个特别大的上届
+            
+                except Exception:
+                    self._logd(f"slave_pos{slave_pos}, master_pos{master_pos}")
+                    return
+                
+                
+                
+                self.__data_interface.pub_slave_manip_ctrl(
+                    self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_vel=master_vel))
+                
+                self.__data_interface.pub_master_manip_ctrl(
+                    self.__build_feedback_ctrl(arm_jnt_pos=master_target_pos,arm_jnt_vel=slave_vel))
+                
+            self.__data_interface.sleep()
+            
+                
 
-            
-    ##############################################################
-    # tools
-    ##############################################################
-    def __deadzone(self ,var, deadzone):
-        res = var.copy()
-        zero_mask = np.fabs(res) < deadzone
-        res[zero_mask] = 0.0
-        res[~zero_mask] -= np.sign(res[~zero_mask]) * deadzone[~zero_mask]
-        return res
-            
-    
+    def deadzone(self,current, target, deadzone):
+        """
+        死区补偿：输入当前值、目标值、死区宽度，返回补偿后的目标值。
+        补偿后，实际变化量（经过死区）等于 target - current。
+        支持标量或 numpy 数组。
+        """
+        e = target - current
+        e_abs = np.fabs(e)
+        # 下界补偿
+        zero_mask = (e_abs <= deadzone)
+        e[zero_mask] = 0.0
+        e[~zero_mask] = e[~zero_mask] - np.sign(e[~zero_mask]) * deadzone[~zero_mask]
+        
+        # 上届补偿
+        e = np.clip(e, -10.0 *deadzone,  10.0 *deadzone)
+        return current + e     
+
+
 def main():
     arm_force_feedback = ArmForceFeedback()
     try:

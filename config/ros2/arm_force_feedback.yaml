@@ -27,17 +27,13 @@ arm_force_feedback:
     grip_stable_kd: [0.5]
 
     # gains used for master feedback control
-    arm_master_kp: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    arm_master_kp: [30.0, 30.0, 30.0, 30.0, 30.0, 30.0]
     arm_master_kd: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     grip_master_kp: [10.0]
     grip_master_kd: [0.5]
 
     # gains used for slave follow control
-    arm_slave_kp: [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
-    arm_slave_kd: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0]
+    arm_slave_kp:  [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+    arm_slave_kd: [5.0, 5.0, 5.0, 5.0, 2.0, 2.0]
     grip_slave_kp: [10.0]
     grip_slave_kd: [0.5]
-
-    # force feedback compensation: slave external force → master
-    feedback_scale: [1.0, 1.0, 1.0, 0.5, 0.5, 0.5]
-    feedback_deadzone: [7.0, 7.0, 7.0, 3.0, 2.0, 2.0]

@@ -35,7 +35,3 @@ arm_slave_kp: [0.0, 0.0, 0.0, 150.0, 100.0, 100.0]
 arm_slave_kd: [0.0, 0.0, 0.0, 5.0, 2.0, 2.0]
 grip_slave_kp: [10.0]
 grip_slave_kd: [0.5]
-
-# force feedback compensation: slave external force → master
-feedback_scale: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
-feedback_deadzone: [7.0, 7.0, 7.0, 3.0, 2.0, 2.0]

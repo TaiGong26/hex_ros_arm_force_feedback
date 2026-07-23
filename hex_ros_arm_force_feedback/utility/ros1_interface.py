@@ -117,14 +117,6 @@ class DataInterface(InterfaceBase):
             list(rospy.get_param('~grip_slave_kp', [10.0])),
             "grip_slave_kd":
             list(rospy.get_param('~grip_slave_kd', [0.5])),
-            "feedback_scale":
-            list(
-                rospy.get_param('~feedback_scale',
-                                [0.5, 0.5, 0.5, 0.5, 0.5, 0.5])),
-            "feedback_deadzone":
-            list(
-                rospy.get_param('~feedback_deadzone',
-                                [7.0, 7.0, 7.0, 3.0, 2.0, 2.0])),
         }
 
         ### publisher
