@@ -89,24 +89,23 @@ class ArmForceFeedback:
                                     dtype=np.float64)
         self.__grip_stable_kd = np.asarray(self.__force_feedback_param["grip_stable_kd"],
                                     dtype=np.float64)
-        self.__arm_impedance_kp = np.asarray(
-            self.__force_feedback_param["arm_impedance_kp"], dtype=np.float64)
-        self.__arm_impedance_kd = np.asarray(
-            self.__force_feedback_param["arm_impedance_kd"], dtype=np.float64)
-        self.__grip_impedance_kp = np.asarray(
-            self.__force_feedback_param["grip_impedance_kp"], dtype=np.float64)
-        self.__grip_impedance_kd = np.asarray(
-            self.__force_feedback_param["grip_impedance_kd"], dtype=np.float64)
-        
-        
-        self.__arm_slave_follow_kp = np.asarray(
-            self.__force_feedback_param["arm_slave_follow_kp"], dtype=np.float64)
-        self.__arm_slave_follow_kd = np.asarray(
-            self.__force_feedback_param["arm_slave_follow_kd"], dtype=np.float64)
-        self.__grip_slave_follow_kp = np.asarray(
-            self.__force_feedback_param["grip_slave_follow_kp"], dtype=np.float64)
-        self.__grip_slave_follow_kd = np.asarray(
-            self.__force_feedback_param["grip_slave_follow_kd"], dtype=np.float64)
+        self.__arm_master_kp = np.asarray(
+            self.__force_feedback_param["arm_master_kp"], dtype=np.float64)
+        self.__arm_master_kd = np.asarray(
+            self.__force_feedback_param["arm_master_kd"], dtype=np.float64)
+        self.__grip_master_kp = np.asarray(
+            self.__force_feedback_param["grip_master_kp"], dtype=np.float64)
+        self.__grip_master_kd = np.asarray(
+            self.__force_feedback_param["grip_master_kd"], dtype=np.float64)
+
+        self.__arm_slave_kp = np.asarray(
+            self.__force_feedback_param["arm_slave_kp"], dtype=np.float64)
+        self.__arm_slave_kd = np.asarray(
+            self.__force_feedback_param["arm_slave_kd"], dtype=np.float64)
+        self.__grip_slave_kp = np.asarray(
+            self.__force_feedback_param["grip_slave_kp"], dtype=np.float64)
+        self.__grip_slave_kd = np.asarray(
+            self.__force_feedback_param["grip_slave_kd"], dtype=np.float64)
         self.__arrive_threshold = self.__force_feedback_param["arrive_threshold"]
 
         ### threads
@@ -210,8 +209,8 @@ class ArmForceFeedback:
                 if arm_jnt_pos is not None else self.__arm_start_pos.copy(),
                 vel=np.zeros(ARM_DOF),
                 eff= arm_jnt_eff if arm_jnt_eff is not None else np.zeros(ARM_DOF),
-                kp=self.__arm_slave_follow_kp.copy(),
-                kd=self.__arm_slave_follow_kd.copy(),
+                kp=self.__arm_slave_kp.copy(),
+                kd=self.__arm_slave_kd.copy(),
                 lim_vel=np.zeros(ARM_DOF),
                 lim_acc=np.zeros(ARM_DOF),
             ),
@@ -224,8 +223,8 @@ class ArmForceFeedback:
                 if grip_jnt_pos is not None else self.__grip_stable_pos.copy(),
                 vel=np.zeros(GRIP_DOF),
                 eff=np.zeros(GRIP_DOF),
-                kp=self.__grip_impedance_kp.copy(),
-                kd=self.__grip_impedance_kd.copy(),
+                kp=self.__grip_slave_kp.copy(),
+                kd=self.__grip_slave_kd.copy(),
                 lim_vel=np.zeros(GRIP_DOF),
                 lim_acc=np.zeros(GRIP_DOF),
             ),
@@ -235,9 +234,9 @@ class ArmForceFeedback:
     def __build_feedback_ctrl(self, 
             arm_jnt_pos: Optional[np.ndarray] = None,
             arm_jnt_eff: Optional[np.ndarray] = None,) -> HexDcRoboManipCtrl:
-        # MIT mode with zero gains: the driver/sim adds the model gravity +
-        # coriolis compensation (via `grav`), so the only commanded effort is
-        # the torque that holds the extra end-effector payload.
+        # MIT mode with master-side PD gains: the driver/sim adds the model
+        # gravity + coriolis compensation (via `grav`), so the commanded
+        # effort combines PD feedback with the compensation torque.
         arm_ctrl = HexDcRoboArmCtrl(
             ctrl_mode=HexDcRoboArmCtrlMode.MIT,
             grav=HexDcBaseVector3(
@@ -249,8 +248,8 @@ class ArmForceFeedback:
                 pos=  np.asarray(arm_jnt_pos, dtype=np.float64) if arm_jnt_pos is not None else np.zeros(ARM_DOF) ,
                 vel=np.zeros(ARM_DOF),
                 eff=np.asarray(arm_jnt_eff, dtype=np.float64),
-                kp=np.zeros(ARM_DOF),
-                kd=np.zeros(ARM_DOF),
+                kp=self.__arm_master_kp.copy(),
+                kd=self.__arm_master_kd.copy(),
                 lim_vel=np.zeros(ARM_DOF),
                 lim_acc=np.zeros(ARM_DOF),
             ),
@@ -262,8 +261,8 @@ class ArmForceFeedback:
                 pos=np.zeros(GRIP_DOF),
                 vel=np.zeros(GRIP_DOF),
                 eff=np.zeros(GRIP_DOF),
-                kp=np.zeros(GRIP_DOF),
-                kd=np.zeros(GRIP_DOF),
+                kp=self.__grip_master_kp.copy(),
+                kd=self.__grip_master_kd.copy(),
                 lim_vel=np.zeros(GRIP_DOF),
                 lim_acc=np.zeros(GRIP_DOF),
             ),
@@ -346,7 +345,7 @@ class ArmForceFeedback:
             traceback.print_exc()
 
     def __work_process(self):
-        self.__data_interface.logi("[arm_force_feedback]: start impedance control")
+        self.__data_interface.logi("[arm_force_feedback]: start force feedback control")
             
         # self.__follow_test()
         self.__feedback_test()

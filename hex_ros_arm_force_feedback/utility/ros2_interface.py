@@ -81,18 +81,18 @@ class DataInterface(InterfaceBase):
         self.__node.declare_parameter('arm_stable_kd', [5.0, 5.0, 5.0, 5.0, 2.0, 2.0])
         self.__node.declare_parameter('grip_stable_kp', [10.0])
         self.__node.declare_parameter('grip_stable_kd', [0.5])
-        self.__node.declare_parameter('arm_impedance_kp',
-                                      [100.0, 100.0, 125.0, 75.0, 50.0, 50.0])
-        self.__node.declare_parameter('arm_impedance_kd',
-                                      [2.5, 2.5, 2.5, 2.5, 1.0, 1.0])
         self.__node.declare_parameter('arm_pos_threshold', 0.1)
-        self.__node.declare_parameter('grip_impedance_kp', [10.0])
-        self.__node.declare_parameter('grip_impedance_kd', [0.5])
-        self.__node.declare_parameter('arm_slave_follow_kp',
+        self.__node.declare_parameter('arm_master_kp',
                                       [0.0, 0.0, 0.0, 150.0, 100.0, 100.0])
-        self.__node.declare_parameter('arm_slave_follow_kd', [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])
-        self.__node.declare_parameter('grip_slave_follow_kp', [10.0])
-        self.__node.declare_parameter('grip_slave_follow_kd', [0.5])
+        self.__node.declare_parameter('arm_master_kd',
+                                      [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])
+        self.__node.declare_parameter('grip_master_kp', [10.0])
+        self.__node.declare_parameter('grip_master_kd', [0.5])
+        self.__node.declare_parameter('arm_slave_kp',
+                                      [0.0, 0.0, 0.0, 150.0, 100.0, 100.0])
+        self.__node.declare_parameter('arm_slave_kd', [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])
+        self.__node.declare_parameter('grip_slave_kp', [10.0])
+        self.__node.declare_parameter('grip_slave_kd', [0.5])
         self.__node.declare_parameter('arrive_threshold', 0.06)
 
         self._rate_param.update({
@@ -124,24 +124,24 @@ class DataInterface(InterfaceBase):
             list(self.__node.get_parameter('grip_stable_kp').value),
             "grip_stable_kd":
             list(self.__node.get_parameter('grip_stable_kd').value),
-            "arm_impedance_kp":
-            list(self.__node.get_parameter('arm_impedance_kp').value),
-            "arm_impedance_kd":
-            list(self.__node.get_parameter('arm_impedance_kd').value),
             "arm_pos_threshold":
             self.__node.get_parameter('arm_pos_threshold').value,
-            "grip_impedance_kp":
-            list(self.__node.get_parameter('grip_impedance_kp').value),
-            "grip_impedance_kd":
-            list(self.__node.get_parameter('grip_impedance_kd').value),
-            "arm_slave_follow_kp":
-            list(self.__node.get_parameter('arm_slave_follow_kp').value),
-            "arm_slave_follow_kd":
-            list(self.__node.get_parameter('arm_slave_follow_kd').value),
-            "grip_slave_follow_kp":
-            list(self.__node.get_parameter('grip_slave_follow_kp').value),
-            "grip_slave_follow_kd":
-            list(self.__node.get_parameter('grip_slave_follow_kd').value),
+            "arm_master_kp":
+            list(self.__node.get_parameter('arm_master_kp').value),
+            "arm_master_kd":
+            list(self.__node.get_parameter('arm_master_kd').value),
+            "grip_master_kp":
+            list(self.__node.get_parameter('grip_master_kp').value),
+            "grip_master_kd":
+            list(self.__node.get_parameter('grip_master_kd').value),
+            "arm_slave_kp":
+            list(self.__node.get_parameter('arm_slave_kp').value),
+            "arm_slave_kd":
+            list(self.__node.get_parameter('arm_slave_kd').value),
+            "grip_slave_kp":
+            list(self.__node.get_parameter('grip_slave_kp').value),
+            "grip_slave_kd":
+            list(self.__node.get_parameter('grip_slave_kd').value),
             "arrive_threshold":
             self.__node.get_parameter('arrive_threshold').value,
         }

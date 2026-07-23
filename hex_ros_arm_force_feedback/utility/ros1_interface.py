@@ -93,32 +93,32 @@ class DataInterface(InterfaceBase):
             list(rospy.get_param('~grip_stable_kp', [10.0])),
             "grip_stable_kd":
             list(rospy.get_param('~grip_stable_kd', [0.5])),
-            "arm_impedance_kp":
-            list(
-                rospy.get_param('~arm_impedance_kp',
-                                [100.0, 100.0, 125.0, 75.0, 50.0, 50.0])),
-            "arm_impedance_kd":
-            list(
-                rospy.get_param('~arm_impedance_kd',
-                                [2.5, 2.5, 2.5, 2.5, 1.0, 1.0])),
             "arm_pos_threshold":
             rospy.get_param('~arm_pos_threshold', 0.1),
-            "grip_impedance_kp":
-            list(rospy.get_param('~grip_impedance_kp', [10.0])),
-            "grip_impedance_kd":
-            list(rospy.get_param('~grip_impedance_kd', [0.5])),
-            "arm_slave_follow_kp":
+            "arm_master_kp":
             list(
-                rospy.get_param('~arm_slave_follow_kp',
+                rospy.get_param('~arm_master_kp',
                                 [0.0, 0.0, 0.0, 150.0, 100.0, 100.0])),
-            "arm_slave_follow_kd":
+            "arm_master_kd":
             list(
-                rospy.get_param('~arm_slave_follow_kd',
+                rospy.get_param('~arm_master_kd',
                                 [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])),
-            "grip_slave_follow_kp":
-            list(rospy.get_param('~grip_slave_follow_kp', [10.0])),
-            "grip_slave_follow_kd":
-            list(rospy.get_param('~grip_slave_follow_kd', [0.5])),
+            "grip_master_kp":
+            list(rospy.get_param('~grip_master_kp', [10.0])),
+            "grip_master_kd":
+            list(rospy.get_param('~grip_master_kd', [0.5])),
+            "arm_slave_kp":
+            list(
+                rospy.get_param('~arm_slave_kp',
+                                [0.0, 0.0, 0.0, 150.0, 100.0, 100.0])),
+            "arm_slave_kd":
+            list(
+                rospy.get_param('~arm_slave_kd',
+                                [0.0, 0.0, 0.0, 5.0, 2.0, 2.0])),
+            "grip_slave_kp":
+            list(rospy.get_param('~grip_slave_kp', [10.0])),
+            "grip_slave_kd":
+            list(rospy.get_param('~grip_slave_kd', [0.5])),
             "arrive_threshold":
             rospy.get_param('~arrive_threshold', 0.06),
         }
