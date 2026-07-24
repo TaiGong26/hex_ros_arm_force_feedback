@@ -33,7 +33,7 @@ arm_force_feedback:
     grip_master_kd: [0.5]
 
     # gains used for slave follow control
-    arm_slave_kp:  [100.0, 100.0, 100.0, 100.0, 100.0, 100.0]
+    arm_slave_kp:  [200.0, 200.0, 250.0, 150.0, 100.0, 100.0]
     arm_slave_kd: [5.0, 5.0, 5.0, 5.0, 2.0, 2.0]
     grip_slave_kp: [10.0]
     grip_slave_kd: [0.5]

@@ -133,7 +133,8 @@ class ArmForceFeedback:
     # Lifecycle
     ##############################################################
     def start(self):
-        self.__stop_event.clear()
+        self.__stop_event.clear()        
+        self.__start_event.clear()
         self.__teleop_thread.start()
         self.__init_process()
 
@@ -390,7 +391,7 @@ class ArmForceFeedback:
         self.__data_interface.logi("press 'q' to exit force feedback control")
         
         while self.__is_running() and not self.__start_event.is_set():
-            time.sleep(0.1)
+            self.__data_interface.sleep()
         
         self.__data_interface.logi("start force feedback control")
         
@@ -447,7 +448,6 @@ class ArmForceFeedback:
                     self.__build_feedback_ctrl(arm_jnt_pos=master_target_pos, arm_jnt_vel=slave_vel))
                 
             self.__data_interface.sleep()
-            
 
     def __compute_effective_target(
             self, 
