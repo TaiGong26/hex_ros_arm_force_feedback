@@ -158,7 +158,7 @@ class TrajectoryPlanner(TrajectoryControllerBase):
 class Move2TargetPlanner(TrajectoryControllerBase):
     """Controller for smooth move to target position"""
     
-    def __init__(self, start_position, target_position, duration=5):
+    def __init__(self, start_position, target_position, duration: float = 5.0):
         """
         Initialize move to target controller
         start_position: Starting position (current position when Ctrl+C is pressed)
