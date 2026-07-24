@@ -130,7 +130,6 @@ class ArmForceFeedback:
         self.__teleop_thread = threading.Thread(target=self.__teleop_process)
         self.__teleop_dt = 1.0 / max(float(self.__rate_param["teleop"]), 1.0)
         
-        self.__ARM_DOF = 6
         
         self._logd = self.__data_interface.logd
 
@@ -438,10 +437,16 @@ class ArmForceFeedback:
                 master_vel = np.asarray(master_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
 
                 # ★ grip state
-                grip_master_pos = np.asarray(
-                    master_state.manip_state.grip_state.jnt.position, dtype=np.float64)
-                grip_master_vel = np.asarray(
-                    master_state.manip_state.grip_state.jnt.velocity, dtype=np.float64)
+                try:
+                    grip_master_pos = np.asarray(
+                        master_state.manip_state.grip_state.jnt.position, dtype=np.float64)
+                    grip_master_vel = np.asarray(
+                        master_state.manip_state.grip_state.jnt.velocity, dtype=np.float64)
+                except Exception:
+                    grip_master_pos = None
+                    grip_master_vel = None
+                    self.__data_interface.logw("master grip state not available")
+
 
             ## slave
             if slave_state is not None:
@@ -450,10 +455,16 @@ class ArmForceFeedback:
                 slave_vel = np.asarray(slave_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
 
                 # ★ grip state
-                grip_slave_pos = np.asarray(
-                    slave_state.manip_state.grip_state.jnt.position, dtype=np.float64)
-                grip_slave_vel = np.asarray(
-                    slave_state.manip_state.grip_state.jnt.velocity, dtype=np.float64)
+                try:
+                    grip_slave_pos = np.asarray(
+                        slave_state.manip_state.grip_state.jnt.position, dtype=np.float64)
+                    grip_slave_vel = np.asarray(
+                        slave_state.manip_state.grip_state.jnt.velocity, dtype=np.float64)
+                except Exception:
+                    grip_slave_pos = None
+                    grip_slave_vel = None
+                    self.__data_interface.logw("slave grip state not available")
+
 
             if master_pos is not None and slave_pos is not None and master_vel is not None:
 
@@ -476,7 +487,7 @@ class ArmForceFeedback:
                             master_pos, master_vel, base_frame=True)[3][:3, :ARM_DOF]
                     extra_tau = jac.T @ self.__extra_force
 
-                # ★ Grip 力反馈
+                # Grip  feedback
                 grip_master_target = grip_slave_target = None
                 if (grip_master_pos is not None and grip_slave_pos is not None
                         and grip_master_pos.shape[0] == GRIP_DOF
@@ -490,6 +501,7 @@ class ArmForceFeedback:
                             self.__grip_slave_deadzone, self.__grip_slave_clip)
                     except Exception:
                         traceback.print_exc()
+
 
                 # pub cmd
                 self.__data_interface.pub_slave_manip_ctrl(

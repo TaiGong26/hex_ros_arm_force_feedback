@@ -2,7 +2,7 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>hex_ros_arm_force_feedback</name>
-  <version>0.0.0</version>
+  <version>0.1.0</version>
   <description>Impedance control demo for the Archer Y6 arm</description>
   <maintainer email="dzr159@gmail.com">Dong Zhaorui</maintainer>
   <license>Apache-2.0</license>
