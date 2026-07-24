@@ -37,6 +37,8 @@ from hex_util_msg.dataclass.dataclass_robo import (
 )
 from hex_util_ros import HexDynUtilY6
 
+from TrajectoryController import Move2TargetPlanner
+
 ARM_DOF = 6
 GRIP_DOF = 1
 
@@ -105,6 +107,14 @@ class ArmForceFeedback:
             self.__force_feedback_param["grip_slave_kp"], dtype=np.float64)
         self.__grip_slave_kd = np.asarray(
             self.__force_feedback_param["grip_slave_kd"], dtype=np.float64)
+        self.__arm_master_deadzone = np.asarray(
+            self.__force_feedback_param["arm_master_deadzone"], dtype=np.float64)
+        self.__arm_master_clip = np.asarray(
+            self.__force_feedback_param["arm_master_clip"], dtype=np.float64)
+        self.__arm_slave_deadzone = np.asarray(
+            self.__force_feedback_param["arm_slave_deadzone"], dtype=np.float64)
+        self.__arm_slave_clip = np.asarray(
+            self.__force_feedback_param["arm_slave_clip"], dtype=np.float64)
 
         ### threads
         self.__stop_event = threading.Event()
@@ -349,39 +359,10 @@ class ArmForceFeedback:
     def __work_process(self):
         self.__data_interface.logi("[arm_force_feedback]: start force feedback control")
             
-        # self.__follow_test()
-        self.__feedback_test()
-
-    def __follow_test(self):
+        self.__feedback()
+            
+    def __feedback(self):
         
-        while self.__is_running():
-        
-            master_state = self.__data_interface.get_master_manip_state(latest=True)
-            slave_state = self.__data_interface.get_slave_manip_state(latest=True)
-
-            master_q = None
-            
-            extra_tau = np.zeros(ARM_DOF)
-            
-            ### master
-            if master_state is not None:
-                master_q = np.asarray(master_state.manip_state.arm_state.jnt.position,
-                                dtype=np.float64)
-            
-            if extra_tau is not None:
-                self.__data_interface.pub_master_manip_ctrl(
-                        self.__build_feedback_ctrl(arm_jnt_eff=extra_tau))
-            
-            if master_q is not None:
-                
-                self.__data_interface.pub_slave_manip_ctrl(
-                    self.__build_follow_ctrl(master_q))
-                
-            self.__data_interface.sleep()
-            
-    def __feedback_test(self):
-        
-        res_feedback=False
         master_pos = None       
         master_vel = None
         
@@ -390,38 +371,37 @@ class ArmForceFeedback:
         
         master_target_pos = slave_target_pos = None
 
-        comp_deadzone =np.ones(6)*0.1
-
-
         while self.__is_running():
             master_state = self.__data_interface.get_master_manip_state(latest=True)
             slave_state = self.__data_interface.get_slave_manip_state(latest=True)
 
             ## master
             if master_state is not None:
-                
+
                 # state
                 master_pos = np.asarray(master_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 master_vel = np.asarray(master_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
-                
+
 
             ## slave
             if slave_state is not None:
-                
+
                 slave_pos = np.asarray(slave_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 slave_vel = np.asarray(slave_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
-                
-            
-                
+
+
+
             if master_pos is not None and slave_pos is not None:
-                
+
                 try:
-                    
-                    # deadzone compensation
-                    master_target_pos = self.deadzone(master_pos,slave_pos,comp_deadzone)
-            
-                    # TODO: 增加 slave的上界，不要给一个特别大的上届
-            
+
+                    # master 侧：从端位置 → 主端反馈（带死区+限幅）
+                    master_target_pos = self.__compute_effective_target(master_pos, slave_pos,
+                                                     self.__arm_master_deadzone, self.__arm_master_clip)
+                    # slave 侧：主端位置 → 从端跟随（带死区+限幅）
+                    slave_target_pos = self.__compute_effective_target(slave_pos, master_pos,
+                                                     self.__arm_slave_deadzone, self.__arm_slave_clip)
+
                 except Exception:
                     self._logd(f"slave_pos{slave_pos}, master_pos{master_pos}")
                     return
@@ -429,30 +409,43 @@ class ArmForceFeedback:
                 
                 
                 self.__data_interface.pub_slave_manip_ctrl(
-                    self.__build_follow_ctrl(arm_jnt_pos=master_pos,arm_jnt_vel=master_vel))
-                
+                    self.__build_follow_ctrl(arm_jnt_pos=slave_target_pos, arm_jnt_vel=master_vel))
+
                 self.__data_interface.pub_master_manip_ctrl(
-                    self.__build_feedback_ctrl(arm_jnt_pos=master_target_pos,arm_jnt_vel=slave_vel))
+                    self.__build_feedback_ctrl(arm_jnt_pos=master_target_pos, arm_jnt_vel=slave_vel))
                 
             self.__data_interface.sleep()
             
-                
 
-    def deadzone(self,current, target, deadzone):
+    def __compute_effective_target(
+            self, 
+            current: np.ndarray, 
+            target: np.ndarray, 
+            deadzone:  Optional[np.ndarray], 
+            clip_bound: Optional[np.ndarray] = None
+        ) -> np.ndarray:
         """
-        死区补偿：输入当前值、目标值、死区宽度，返回补偿后的目标值。
-        补偿后，实际变化量（经过死区）等于 target - current。
-        支持标量或 numpy 数组。
+        Apply deadzone compensation and saturation clipping.
+    
+        Args:
+            current: Current joint positions, shape (N,)
+            target: Desired joint positions, shape (N,)
+            deadzone: Per-joint deadzone width, shape (N,)
+            clip_bound: Per-joint saturation limit, shape (N,). None = no clipping.
+        
+        Returns:
+            Effective target after deadzone + clipping, shape (N,)
         """
         e = target - current
-        e_abs = np.fabs(e)
-        # 下界补偿
-        zero_mask = (e_abs <= deadzone)
-        e[zero_mask] = 0.0
-        e[~zero_mask] = e[~zero_mask] - np.sign(e[~zero_mask]) * deadzone[~zero_mask]
         
-        # 上届补偿
-        e = np.clip(e, -10.0 *deadzone,  10.0 *deadzone)
+        if deadzone is not None:
+            e_abs = np.fabs(e)
+            zero_mask = (e_abs <= deadzone)
+            e[zero_mask] = 0.0
+            e[~zero_mask] = e[~zero_mask] - np.sign(e[~zero_mask]) * deadzone[~zero_mask]
+        
+        if clip_bound is not None:
+            e = np.clip(e, -clip_bound, clip_bound)
         return current + e     
 
 

@@ -37,3 +37,13 @@ arm_force_feedback:
     arm_slave_kd: [5.0, 5.0, 5.0, 5.0, 2.0, 2.0]
     grip_slave_kp: [10.0]
     grip_slave_kd: [0.5]
+
+    # master deadzone: per-joint lower bound, error below threshold → zero [rad]
+    arm_master_deadzone: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    # master error clip: per-joint upper bound, max compensated error [rad]
+    arm_master_clip: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+    # slave deadzone: per-joint lower bound, error below threshold → zero [rad]
+    arm_slave_deadzone: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+    # slave error clip: per-joint upper bound, max compensated error [rad]
+    arm_slave_clip: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
