@@ -118,6 +118,7 @@ class ArmForceFeedback:
 
         ### threads
         self.__stop_event = threading.Event()
+        self.__start_event = threading.Event()
         self.__teleop_thread = threading.Thread(target=self.__teleop_process)
         self.__teleop_dt = 1.0 / max(float(self.__rate_param["teleop"]), 1.0)
         
@@ -166,7 +167,7 @@ class ArmForceFeedback:
             orientation=HexDcBaseQuaternion(x=0.0, y=0.0, z=0.0, w=1.0),
         )
 
-    def __build_stable_ctrl(self, is_start: bool = True) -> HexDcRoboManipCtrl:
+    def __build_stable_ctrl(self, jnt_pos: np.ndarray) -> HexDcRoboManipCtrl:
         arm_ctrl = HexDcRoboArmCtrl(
             ctrl_mode=HexDcRoboArmCtrlMode.JNT,
             grav=HexDcBaseVector3(
@@ -175,8 +176,7 @@ class ArmForceFeedback:
                 z=float(self.__gravity[2]),
             ),
             jnt=HexDcBaseJntFull(
-                pos=self.__arm_start_pos.copy()
-                if is_start else self.__arm_end_pos.copy(),
+                pos=jnt_pos,
                 vel=np.zeros(ARM_DOF),
                 eff=np.zeros(ARM_DOF),
                 kp=self.__arm_stable_kp.copy(),
@@ -288,6 +288,7 @@ class ArmForceFeedback:
     ##############################################################
     def __teleop_process(self):
         prev_q = False
+        prev_s = False
         while self.__is_running():
             time.sleep(self.__teleop_dt)
 
@@ -301,47 +302,74 @@ class ArmForceFeedback:
                 self.__stop_event.set()
             prev_q = curr_q
 
-    def __arrived_at(self, jnt_pos: np.ndarray,
-                     target: np.ndarray) -> bool:
-        if jnt_pos.shape != target.shape:
-            return False
-        err = target - jnt_pos
-        return bool(np.fabs(err).max() < 0.06)
+            curr_s = bool(keys.key_s)
+            if curr_s and not prev_s:
+                self.__start_event.set()
+            prev_s = curr_s
+            
 
     def __move_to_stable(self, phase: str, is_start: bool = True):
         self.__data_interface.logi(
             f"[arm_force_feedback]: move to {phase} position")
-        stable_ctrl = self.__build_stable_ctrl(is_start)
+        
         stable_pos = self.__arm_start_pos if is_start else self.__arm_end_pos
-        while self.__data_interface.ok():
-            master_arrived = False
-            slave_arrived = False
+        duration = 10
 
-            # master state
+        
+        master_state = self.__data_interface.get_master_manip_state(
+            latest=True)
+        while master_state is None and self.__data_interface.ok():
+            self.__data_interface.logw(
+                "waiting for master state...")
+            time.sleep(0.1)
             master_state = self.__data_interface.get_master_manip_state(
                 latest=True)
-            if master_state is not None:
-                master_jnt_pos = np.asarray(
-                    master_state.manip_state.arm_state.jnt.position,
-                    dtype=np.float64,
-                )
-                master_arrived = self.__arrived_at(master_jnt_pos, stable_pos)
-
-            # slave state
+        
+        slave_state = self.__data_interface.get_slave_manip_state(
+            latest=True)
+        while slave_state is None and self.__data_interface.ok():
+            self.__data_interface.logw(
+                "waiting for slave state...")
+            time.sleep(0.1)
             slave_state = self.__data_interface.get_slave_manip_state(
                 latest=True)
-            if slave_state is not None:
-                slave_jnt_pos = np.asarray(
-                    slave_state.manip_state.arm_state.jnt.position,
-                    dtype=np.float64,
-                )
-                slave_arrived = self.__arrived_at(slave_jnt_pos, stable_pos)
 
-            if master_arrived and slave_arrived:
+        # initialize planners
+        if master_state is not None and slave_state is not None:
+            master_jnt = np.asarray(
+                master_state.manip_state.arm_state.jnt.position,
+                dtype=np.float64)
+            slave_jnt = np.asarray(
+                slave_state.manip_state.arm_state.jnt.position,
+                dtype=np.float64)
+
+            master_planner = Move2TargetPlanner(
+                        master_jnt, stable_pos, duration)
+            slave_planner = Move2TargetPlanner(
+                        slave_jnt, stable_pos, duration)
+            
+            master_planner.start_trajectory()   
+            slave_planner.start_trajectory()
+
+
+        while self.__data_interface.ok():
+
+            master_done = slave_done = False
+
+            if master_planner is not None:
+                master_target, master_done = master_planner.get_target_position()
+                self.__data_interface.pub_master_manip_ctrl(
+                    self.__build_stable_ctrl(jnt_pos=master_target))
+
+            if slave_planner is not None:
+                slave_target, slave_done = slave_planner.get_target_position()
+                self.__data_interface.pub_slave_manip_ctrl(
+                    self.__build_stable_ctrl(jnt_pos=slave_target))
+
+            if master_planner is not None and slave_planner is not None \
+                    and master_done and slave_done:
                 break
 
-            self.__data_interface.pub_master_manip_ctrl(stable_ctrl)
-            self.__data_interface.pub_slave_manip_ctrl(stable_ctrl)
             self.__data_interface.sleep()
 
     def __init_process(self):
@@ -357,8 +385,15 @@ class ArmForceFeedback:
             traceback.print_exc()
 
     def __work_process(self):
-        self.__data_interface.logi("[arm_force_feedback]: start force feedback control")
-            
+        
+        self.__data_interface.logi("press 's' to start force feedback control")
+        self.__data_interface.logi("press 'q' to exit force feedback control")
+        
+        while self.__is_running() and not self.__start_event.is_set():
+            time.sleep(0.1)
+        
+        self.__data_interface.logi("start force feedback control")
+        
         self.__feedback()
             
     def __feedback(self):
@@ -389,24 +424,21 @@ class ArmForceFeedback:
                 slave_pos = np.asarray(slave_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 slave_vel = np.asarray(slave_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
 
-
-
             if master_pos is not None and slave_pos is not None:
 
                 try:
 
-                    # master 侧：从端位置 → 主端反馈（带死区+限幅）
                     master_target_pos = self.__compute_effective_target(master_pos, slave_pos,
-                                                     self.__arm_master_deadzone, self.__arm_master_clip)
-                    # slave 侧：主端位置 → 从端跟随（带死区+限幅）
+                        self.__arm_master_deadzone, self.__arm_master_clip)
+                    
                     slave_target_pos = self.__compute_effective_target(slave_pos, master_pos,
-                                                     self.__arm_slave_deadzone, self.__arm_slave_clip)
+                        self.__arm_slave_deadzone, self.__arm_slave_clip)
 
                 except Exception:
-                    self._logd(f"slave_pos{slave_pos}, master_pos{master_pos}")
-                    return
+                    traceback.print_exc()
                 
                 
+                self._logd(f"master_target_pos{master_target_pos}, slave_target_pos{slave_target_pos}") 
                 
                 self.__data_interface.pub_slave_manip_ctrl(
                     self.__build_follow_ctrl(arm_jnt_pos=slave_target_pos, arm_jnt_vel=master_vel))
