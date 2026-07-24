@@ -133,6 +133,14 @@ class DataInterface(InterfaceBase):
             list(
                 rospy.get_param('~arm_slave_clip',
                                 [1.0, 1.0, 1.0, 1.0, 1.0, 1.0])),
+            "grip_master_deadzone":
+            list(rospy.get_param('~grip_master_deadzone', [0.01])),
+            "grip_master_clip":
+            list(rospy.get_param('~grip_master_clip', [0.5])),
+            "grip_slave_deadzone":
+            list(rospy.get_param('~grip_slave_deadzone', [0.01])),
+            "grip_slave_clip":
+            list(rospy.get_param('~grip_slave_clip', [0.3])),
         }
 
         ### publisher

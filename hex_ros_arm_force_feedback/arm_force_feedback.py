@@ -115,6 +115,14 @@ class ArmForceFeedback:
             self.__force_feedback_param["arm_slave_deadzone"], dtype=np.float64)
         self.__arm_slave_clip = np.asarray(
             self.__force_feedback_param["arm_slave_clip"], dtype=np.float64)
+        self.__grip_master_deadzone = np.asarray(
+            self.__force_feedback_param["grip_master_deadzone"], dtype=np.float64)
+        self.__grip_master_clip = np.asarray(
+            self.__force_feedback_param["grip_master_clip"], dtype=np.float64)
+        self.__grip_slave_deadzone = np.asarray(
+            self.__force_feedback_param["grip_slave_deadzone"], dtype=np.float64)
+        self.__grip_slave_clip = np.asarray(
+            self.__force_feedback_param["grip_slave_clip"], dtype=np.float64)
 
         ### threads
         self.__stop_event = threading.Event()
@@ -403,13 +411,20 @@ class ArmForceFeedback:
             
     def __feedback(self):
         
-        master_pos = None       
+        master_pos = None
         master_vel = None
-        
+
         slave_pos = None
         slave_vel = None
-        
+
         master_target_pos = slave_target_pos = None
+
+        # ★ grip 状态变量
+        grip_master_pos = None
+        grip_master_vel = None
+        grip_slave_pos = None
+        grip_slave_vel = None
+        grip_master_target = grip_slave_target = None
 
         while self.__is_running():
             master_state = self.__data_interface.get_master_manip_state(latest=True)
@@ -422,11 +437,23 @@ class ArmForceFeedback:
                 master_pos = np.asarray(master_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 master_vel = np.asarray(master_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
 
+                # ★ grip state
+                grip_master_pos = np.asarray(
+                    master_state.manip_state.grip_state.jnt.position, dtype=np.float64)
+                grip_master_vel = np.asarray(
+                    master_state.manip_state.grip_state.jnt.velocity, dtype=np.float64)
+
             ## slave
             if slave_state is not None:
 
                 slave_pos = np.asarray(slave_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 slave_vel = np.asarray(slave_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
+
+                # ★ grip state
+                grip_slave_pos = np.asarray(
+                    slave_state.manip_state.grip_state.jnt.position, dtype=np.float64)
+                grip_slave_vel = np.asarray(
+                    slave_state.manip_state.grip_state.jnt.velocity, dtype=np.float64)
 
             if master_pos is not None and slave_pos is not None and master_vel is not None:
 
@@ -441,25 +468,46 @@ class ArmForceFeedback:
                 except Exception:
                     traceback.print_exc()
                 
-                # self._logd(f"master_target_pos{master_target_pos}, slave_target_pos{slave_target_pos}") 
-                
+                # self._logd(f"master_target_pos{master_target_pos}, slave_target_pos{slave_target_pos}")
+
                 #  Friction compensation
                 if master_pos.shape[0] == ARM_DOF and master_vel.shape[0] == ARM_DOF:
                     jac = self.__dyn_util.dynamic_params(
                             master_pos, master_vel, base_frame=True)[3][:3, :ARM_DOF]
                     extra_tau = jac.T @ self.__extra_force
-                
-                
+
+                # ★ Grip 力反馈
+                grip_master_target = grip_slave_target = None
+                if (grip_master_pos is not None and grip_slave_pos is not None
+                        and grip_master_pos.shape[0] == GRIP_DOF
+                        and grip_slave_pos.shape[0] == GRIP_DOF):
+                    try:
+                        grip_master_target = self.__compute_effective_target(
+                            grip_master_pos, grip_slave_pos,
+                            self.__grip_master_deadzone, self.__grip_master_clip)
+                        grip_slave_target = self.__compute_effective_target(
+                            grip_slave_pos, grip_master_pos,
+                            self.__grip_slave_deadzone, self.__grip_slave_clip)
+                    except Exception:
+                        traceback.print_exc()
+
                 # pub cmd
                 self.__data_interface.pub_slave_manip_ctrl(
-                    self.__build_follow_ctrl(arm_jnt_pos=slave_target_pos, arm_jnt_vel=master_vel)
+                    self.__build_follow_ctrl(
+                        arm_jnt_pos=slave_target_pos,
+                        arm_jnt_vel=master_vel,
+                        grip_jnt_pos=grip_slave_target,
+                        grip_jnt_vel=grip_master_vel,
+                    )
                 )
 
                 self.__data_interface.pub_master_manip_ctrl(
                     self.__build_feedback_ctrl(
-                        arm_jnt_pos=master_target_pos, 
+                        arm_jnt_pos=master_target_pos,
                         arm_jnt_vel=slave_vel,
-                        arm_jnt_eff=extra_tau
+                        arm_jnt_eff=extra_tau,
+                        grip_jnt_pos=grip_master_target,
+                        grip_jnt_vel=grip_slave_vel,
                     )
                 )
                 
