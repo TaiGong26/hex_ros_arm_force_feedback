@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(hex_ros_arm_force_feedback)
+project(hex_ros_demo_arm_force_feedback)
 
 find_package(catkin REQUIRED)
 

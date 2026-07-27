@@ -22,7 +22,7 @@ from launch_ros.substitutions import FindPackageShare
 def generate_launch_description():
     arm_pkg_path = FindPackageShare('hex_ros_robot_arm')
     keyboard_pkg_path = FindPackageShare('hex_ros_teleop_keyboard')
-    force_feedback_pkg_path = FindPackageShare('hex_ros_arm_force_feedback')
+    force_feedback_pkg_path = FindPackageShare('hex_ros_demo_arm_force_feedback')
     urdf_pkg_path = FindPackageShare('hex_ros_urdf_archer_y6')
 
     # ------------------------------------------------------------------
@@ -94,7 +94,7 @@ def generate_launch_description():
     urdf_file_path = PathJoinSubstitution(
         [urdf_pkg_path, "urdf", "gr100_comp.urdf"])
     force_feedback_node = Node(
-        package='hex_ros_arm_force_feedback',
+        package='hex_ros_demo_arm_force_feedback',
         executable='arm_force_feedback',
         name='arm_force_feedback',
         output="screen",

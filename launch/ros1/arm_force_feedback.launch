@@ -6,9 +6,9 @@
 <!--#######################################-->
 
 <launch>
-    <node name="arm_force_feedback" pkg="hex_ros_arm_force_feedback" type="arm_force_feedback.py" output="screen">
+    <node name="arm_force_feedback" pkg="hex_ros_demo_arm_force_feedback" type="arm_force_feedback.py" output="screen">
         <!-- load default parameters -->
-        <rosparam file="$(find hex_ros_arm_force_feedback)/config/ros1/arm_force_feedback.yaml"/>
+        <rosparam file="$(find hex_ros_demo_arm_force_feedback)/config/ros1/arm_force_feedback.yaml"/>
         <!-- robot model used for dynamics -->
         <param name="model_urdf" value="$(find hex_ros_urdf_archer_y6)/urdf/gr100_comp.urdf"/>
         <!-- subscribe -->

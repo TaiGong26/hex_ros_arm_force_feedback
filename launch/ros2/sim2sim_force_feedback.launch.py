@@ -20,7 +20,7 @@ from launch_ros.actions import PushRosNamespace  # 修改这里：PushRosNamespa
 def generate_launch_description():
     sim_pkg_path = FindPackageShare('hex_ros_sim_archer_y6')
     keyboard_pkg_path = FindPackageShare('hex_ros_teleop_keyboard')
-    force_feedback_pkg_path = FindPackageShare('hex_ros_arm_force_feedback')
+    force_feedback_pkg_path = FindPackageShare('hex_ros_demo_arm_force_feedback')
 
     # args
     viewer_arg = DeclareLaunchArgument(

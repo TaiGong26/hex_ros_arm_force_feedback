@@ -1,4 +1,4 @@
-# hex_ros_arm_force_feedback
+# hex_ros_demo_arm_force_feedback
 
 ## What does this package do
 
@@ -67,7 +67,6 @@ Ensure the following software is installed:
 | `arm_impedance_kp` / `kd`     | `vector<double>` | Arm gains used during impedance control.                |
 | `grip_impedance_kp` / `kd`    | `vector<double>` | Gripper gains used during impedance control.            |
 | `arm_se3_threshold`           | `double`         | Max SE(3) error step applied per cycle.                 |
-| `arrive_threshold`            | `double`         | Max joint error [rad] to consider the pose reached.     |
 
 ## Getting Started
 
@@ -88,7 +87,7 @@ Ensure the following software is installed:
 3. Clone the repository:
 
    ```shell
-   git clone https://github.com/hexfellow/hex_ros_arm_force_feedback.git
+   git clone https://github.com/hexfellow/hex_ros_demo_arm_force_feedback.git
    ```
 
 4. Navigate back and build the workspace:
@@ -137,13 +136,13 @@ Ensure the following software is installed:
    For ROS 1:
 
    ```shell
-   roslaunch hex_ros_arm_force_feedback arm_force_feedback.launch
+   roslaunch hex_ros_demo_arm_force_feedback arm_force_feedback.launch
    ```
 
    For ROS 2:
 
    ```shell
-   ros2 launch hex_ros_arm_force_feedback arm_force_feedback.launch.py
+   ros2 launch hex_ros_demo_arm_force_feedback arm_force_feedback.launch.py
    ```
 
 3. The arm moves to the stable pose and then enters impedance control. Press `q` to exit. To record data, use ROS's bag tools, e.g. `ros2 bag record -a`.

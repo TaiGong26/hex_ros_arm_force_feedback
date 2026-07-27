@@ -14,7 +14,7 @@ from launch_ros.substitutions import FindPackageShare
 
 
 def generate_launch_description():
-    force_feedback_pkg_path = FindPackageShare('hex_ros_arm_force_feedback')
+    force_feedback_pkg_path = FindPackageShare('hex_ros_demo_arm_force_feedback')
     urdf_pkg_path = FindPackageShare('hex_ros_urdf_archer_y6')
 
     # arm_force_feedback node
@@ -24,7 +24,7 @@ def generate_launch_description():
         [urdf_pkg_path, "urdf", "gr100_comp.urdf"])
 
     arm_force_feedback_node = Node(
-        package='hex_ros_arm_force_feedback',
+        package='hex_ros_demo_arm_force_feedback',
         executable='arm_force_feedback',
         name='arm_force_feedback',
         output="screen",
