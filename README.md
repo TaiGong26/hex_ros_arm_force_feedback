@@ -1,148 +1,220 @@
 # hex_ros_demo_arm_force_feedback
+[中文](README_cn.md) | **English**
 
-## What does this package do
+## Table of Contents
 
-This package is an **impedance control demo** for the Archer Y6 arm that works in **both ROS 1 and ROS 2**.
+- [1. About](#1-about)
+- [2. Package Structure](#2-package-structure)
+- [3. Topics](#3-topics)
+- [4. Parameters](#4-parameters)
+- [5. Dependencies](#5-dependencies)
+- [6. Quick Start](#6-quick-start)
 
-The node first drives the arm to a stable start pose, then switches into impedance control: at every control cycle it reads the latest arm state, limits the SE(3) pose error toward the stable pose, solves analytic IK for a target joint position, and publishes a `MIT` control command with impedance stiffness/damping. The robot driver (or the [`hex_ros_sim_archer_y6`](../hex_ros_sim_archer_y6) simulator) adds the model gravity/coriolis compensation, so the arm compliantly returns toward the stable pose when disturbed.
+---
 
-A keyboard interface (see [`hex_ros_teleop_keyboard`](../hex_ros_teleop_keyboard)) is used for runtime control:
+## 1. About
 
-* press **`q`** to stop the demo and move the arm back to the stable pose.
+This is the **bilateral force feedback demo** for the **HEXFELLOW** Archer Y6 robotic arm, enabling telepresence control between master and slave arms.
 
-Data recording is left to ROS's built-in bag tools (`ros2 bag record` / `rosbag record`).
+The force feedback control loop centers on `__feedback`, performing the following functions:
 
-## Maintainer
+- **Master-slave tracking control** — At each cycle, reads real-time joint states from both master and slave arms, computes valid target positions via deadzone compensation and clip saturation limiting, and publishes MIT impedance control commands: the slave arm follows the master arm position (`__build_follow_ctrl`, slave-side PD gains), while the master arm reflects the slave arm's force feedback (`__build_feedback_ctrl`, master-side PD gains).
+- **Gripper force feedback** — 1-DoF gripper follows the same pattern, supporting bilateral position tracking and force feedback for both master and slave grippers.
+- **Smooth start/exit** — On start and exit, smoothly transitions both arms from their current positions to stable positions.
+- **Keyboard control** — Press **`s`** to start force feedback control, press **`q`** to stop and return to home position.
 
-[Dong Zhaorui](https://github.com/IBNBlank)
+Supports both **ROS 1** and **ROS 2**, with four launch scenarios: standalone node, simulation-to-simulation (sim2sim), real-to-simulation (real2sim), and real-to-real (real2real).
 
-## Prerequisites
+---
 
-Ensure the following software is installed:
+## 2. Package Structure
 
-* **ROS**: Refer to the [ROS Installation guide](http://wiki.ros.org/ROS/Installation)
-* **hex_ros_msgs**: provides the robot/teleop message definitions.
-* **hex_ros_urdf_archer_y6**: provides the `gr100_comp.urdf` used for the dynamics model.
-* A state/control source for the arm, e.g. **hex_ros_sim_archer_y6**.
-* A keyboard source, e.g. **hex_ros_teleop_keyboard**.
+```
+hex_ros_demo_arm_force_feedback/
+├── config/                                    # Configuration files
+│   ├── ros1/
+│   │   └── arm_force_feedback.yaml            #   ROS 1 params (force_feedback)
+│   └── ros2/
+│       └── arm_force_feedback.yaml            #   ROS 2 params (force_feedback)
+├── launch/                                    # ROS launch files
+│   ├── ros1/
+│   │   ├── arm_force_feedback.launch          #   Standalone node launch
+│   │   └── sim2sim_force_feedback.launch      #   Sim-to-sim full launch
+│   └── ros2/
+│       ├── arm_force_feedback.launch.py       #   Standalone node launch
+│       ├── real2real_force_feedback.launch.py #   Real-to-real full launch
+│       ├── real2sim_force_feedback.launch.py  #   Real-to-sim full launch
+│       └── sim2sim_force_feedback.launch.py   #   Sim-to-sim full launch
+├── hex_ros_demo_arm_force_feedback/           # Core source
+│   ├── arm_force_feedback.py                  #   Main node: bilateral force feedback control loop
+│   ├── TrajectoryController.py                #   Trajectory planner
+│   └── utility/                               #   Dual-layer ROS interface abstraction
+│       ├── __init__.py                        #     ROS version selector (ROS_VERSION env var)
+│       ├── interface_base.py                  #     Abstract base class (InterfaceBase)
+│       ├── ros1_interface.py                  #     ROS 1 DataInterface
+│       └── ros2_interface.py                  #     ROS 2 DataInterface
+├── resource/                                  # ament resource index
+├── setup.py                                   # Python packaging (ROS 2)
+├── CMakeLists.txt                             # CMake packaging (ROS 1)
+├── package.xml                                # ROS package manifest (dual-system conditional deps)
+├── README.md                                  # English documentation
+└── README_cn.md                               # Chinese documentation
+```
 
-### Verified Platforms
+---
 
-* [x] **x64**
-* [ ] **Jetson Orin Nano**
-* [x] **Jetson Orin NX**
-* [ ] **Jetson AGX Orin**
-* [ ] **Horizon RDK X5**
-* [ ] **Rockchip RK3588**
+## 3. Topics
 
-## Public APIs
+| Direction | Topic | Type | Description |
+|-----------|-------|------|-------------|
+| pub | `master/manip_ctrl` | `hex_ros_msgs/(msg/)HexRosRoboManipCtrlStamped` | Master arm MIT force feedback control command (arm + gripper) |
+| pub | `slave/manip_ctrl` | `hex_ros_msgs/(msg/)HexRosRoboManipCtrlStamped` | Slave arm MIT tracking control command (arm + gripper) |
+| sub | `master/manip_state` | `hex_ros_msgs/(msg/)HexRosRoboManipStateStamped` | Master arm real-time state (joint position/velocity/torque) |
+| sub | `slave/manip_state` | `hex_ros_msgs/(msg/)HexRosRoboManipStateStamped` | Slave arm real-time state (joint position/velocity/torque) |
+| sub | `teleop_keyboard_state` | `hex_ros_msgs/(msg/)HexRosTeleopKeyboardStateStamped` | Keyboard key state |
 
-### Published Topics
+> [Message Type Description](https://github.com/hexfellow/hex_ros_msgs#public-apis)
 
-| Topic         | Msg Type                                | Description                                       |
-| ------------- | --------------------------------------- | ------------------------------------------------ |
-| `/manip_ctrl` | `hex_ros_msgs/HexRosRoboManipCtrlStamped` | Arm + gripper control command.                   |
+---
 
-### Subscribed Topics
+## 4. Parameters
 
-| Topic                    | Msg Type                                       | Description                  |
-| ------------------------ | ---------------------------------------------- | ---------------------------- |
-| `/manip_state`           | `hex_ros_msgs/HexRosRoboManipStateStamped`     | Current arm + gripper state. |
-| `/teleop_keyboard_state` | `hex_ros_msgs/HexRosTeleopKeyboardStateStamped` | Keyboard key states.         |
+| Param | Default | Description |
+|-------|---------|-------------|
+| `rate_ros` | 500.0 | Force feedback control loop rate [Hz] |
+| `rate_teleop` | 100.0 | Keyboard monitor rate [Hz] |
+| `model_urdf` | "" | URDF model file path (for dynamics computation) |
+| `model_frame_id` | `base_link` | Robot base frame ID |
+| `pose_end_in_flange` | `[0.187, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0]` | End-effector pose in flange [x, y, z, qw, qx, qy, qz] |
+| `gravity` | `[0.0, 0.0, -9.81]` | Gravity acceleration vector [m/s²] |
+| `arm_start_pos` | `[0.0, 0.1, 2.54, -1.07, 0.0, 0.0]` | Arm stable start position [rad] |
+| `arm_end_pos` | `[0.0, -1.5, 3.0, 0.07, 0.0, 0.0]` | Arm exit home position [rad] |
+| `grip_stable_pos` | `[0.5]` | Gripper stable position |
+| `arm_stable_kp` | `[200.0, 200.0, 250.0, 150.0, 100.0, 100.0]` | Arm stable motion PD gain — proportional |
+| `arm_stable_kd` | `[5.0, 5.0, 5.0, 5.0, 2.0, 2.0]` | Arm stable motion PD gain — derivative |
+| `grip_stable_kp` | `[10.0]` | Gripper stable motion PD gain — proportional |
+| `grip_stable_kd` | `[0.5]` | Gripper stable motion PD gain — derivative |
+| `arm_master_kp` | `[30.0, 30.0, 30.0, 10.0, 5.0, 1.5]` | Master arm force feedback PD gain — proportional |
+| `arm_master_kd` | `[2.0, 2.0, 2.0, 2.1, 0.5, 0.5]` | Master arm force feedback PD gain — derivative |
+| `grip_master_kp` | `[20.0]` | Master gripper force feedback PD gain — proportional |
+| `grip_master_kd` | `[0.0]` | Master gripper force feedback PD gain — derivative |
+| `arm_slave_kp` | `[200.0, 200.0, 250.0, 200.0, 100.0, 100.0]` | Slave arm tracking PD gain — proportional |
+| `arm_slave_kd` | `[5.0, 5.0, 5.0, 5.0, 2.0, 2.0]` | Slave arm tracking PD gain — derivative |
+| `grip_slave_kp` | `[200.0]` | Slave gripper tracking PD gain — proportional |
+| `grip_slave_kd` | `[10.0]` | Slave gripper tracking PD gain — derivative |
+| `arm_master_deadzone` | `[0.1, 0.1, 0.1, 0.2, 0.10, 0.10]` | Master arm deadzone — error below threshold is zeroed [rad] |
+| `arm_master_clip` | `[1.0, 1.0, 1.0, 1.0, 1.0, 1.0]` | Master arm error saturation clip [rad] |
+| `arm_slave_deadzone` | `[0.1, 0.1, 0.1, 0.1, 0.1, 0.1]` | Slave arm deadzone — error below threshold is zeroed [rad] |
+| `arm_slave_clip` | `[0.5, 0.5, 0.5, 0.5, 0.5, 0.5]` | Slave arm error saturation clip [rad] |
+| `grip_master_deadzone` | `[0.01]` | Master gripper deadzone — error below threshold is zeroed [rad] |
+| `grip_master_clip` | `[0.5]` | Master gripper error saturation clip [rad] |
+| `grip_slave_deadzone` | `[0.01]` | Slave gripper deadzone — error below threshold is zeroed [rad] |
+| `grip_slave_clip` | `[0.3]` | Slave gripper error saturation clip [rad] |
 
-### Parameters
+> Parameters are set in `config/`. Default values for `arm_start_pos` and various gain parameters differ slightly between ROS 1 and ROS 2 — refer to the respective config files.
 
-| Name                          | Data Type        | Description                                              |
-| ----------------------------- | ---------------- | -------------------------------------------------------- |
-| `rate_ros`                    | `double`         | Impedance control work loop rate [hz].                  |
-| `rate_teleop`                 | `double`         | Keyboard monitor rate [hz].                             |
-| `model_urdf`                  | `string`         | Path to the URDF used for the dynamics model.           |
-| `model_frame_id`              | `string`         | Frame id of the robot base.                             |
-| `pose_end_in_flange`          | `vector<double>` | End-effector pose in flange `[x,y,z,qw,qx,qy,qz]`.      |
-| `gravity`                     | `vector<double>` | Gravity vector `[x,y,z]` [m/s^2].                       |
-| `arm_stable_pos`              | `vector<double>` | Arm joint stable (init/exit) position [rad].            |
-| `grip_stable_pos`             | `vector<double>` | Gripper stable position.                                |
-| `arm_kp` / `arm_kd`           | `vector<double>` | Arm gains used while moving to the stable position.     |
-| `grip_kp` / `grip_kd`         | `vector<double>` | Gripper gains used while moving to the stable position. |
-| `arm_impedance_kp` / `kd`     | `vector<double>` | Arm gains used during impedance control.                |
-| `grip_impedance_kp` / `kd`    | `vector<double>` | Gripper gains used during impedance control.            |
-| `arm_se3_threshold`           | `double`         | Max SE(3) error step applied per cycle.                 |
+---
 
-## Getting Started
+## 5. Dependencies
 
-1. Install necessary dependencies:
+### Python Packages
 
-   ```shell
-   pip3 install 'hex-util-msg>=0.1.0a0'
-   pip3 install 'hex-util-ros>=0.0.1a0'
-   ```
+```shell
+pip3 install 'hex-util-msg>=0.1.0'
+pip3 install 'hex-util-ros>=0.0.1a0'
+pip3 install 'hex-driver-robot>=0.1.0'
+```
 
-2. Create a workspace and navigate to the `src` directory:
+### ROS Packages
 
-   ```shell
-   mkdir -p catkin_ws/src
-   cd catkin_ws/src
-   ```
+```shell
+git clone https://github.com/hexfellow/hex_ros_msgs.git
+git clone https://github.com/hexfellow/hex_ros_demo_arm_force_feedback.git
+git clone https://github.com/hexfellow/hex_ros_robot_arm.git
+git clone https://github.com/hexfellow/hex_ros_sim_archer_y6.git
+git clone https://github.com/hexfellow/hex_ros_teleop_keyboard.git
+git clone https://github.com/hexfellow/hex_ros_urdf_archer_y6.git
+```
 
-3. Clone the repository:
+---
 
-   ```shell
-   git clone https://github.com/hexfellow/hex_ros_demo_arm_force_feedback.git
-   ```
+## 6. Quick Start
 
-4. Navigate back and build the workspace:
+### 1. Create Workspace
 
-   For ROS 1:
+```shell
+mkdir -p <your_ws>/src
+cd <your_ws>/src
+```
 
-   ```shell
-   cd ../
-   catkin_make
-   ```
+### 2. Clone Repositories
 
-   For ROS 2:
+```shell
+git clone https://github.com/hexfellow/hex_ros_msgs.git
+git clone https://github.com/hexfellow/hex_ros_demo_arm_force_feedback.git
+git clone https://github.com/hexfellow/hex_ros_robot_arm.git
+git clone https://github.com/hexfellow/hex_ros_sim_archer_y6.git
+git clone https://github.com/hexfellow/hex_ros_teleop_keyboard.git
+git clone https://github.com/hexfellow/hex_ros_urdf_archer_y6.git
+```
 
-   ```shell
-   cd ../
-   colcon build
-   ```
+### 3. Build
 
-5. Source the `setup.bash` file:
+**ROS 1:**
 
-   For ROS 1:
+```shell
+source /opt/ros/noetic/setup.bash
+cd <your_ws>
+catkin_make
+source devel/setup.bash
+```
 
-   ```shell
-   source devel/setup.bash --extend
-   ```
+**ROS 2:**
 
-   For ROS 2:
+```shell
+source /opt/ros/humble/setup.bash
+cd <your_ws>
+colcon build
+source install/setup.bash
+```
 
-   ```shell
-   source install/setup.bash --extend
-   ```
+### 4. Use
 
-### Usage
+This package provides launch files for four scenarios. PD gains, deadzone, clip, and other parameters are configured in `config/<ros_version>/arm_force_feedback.yaml`.
 
-1. Start an arm state/control source (e.g. the simulator) and the keyboard node:
+**ROS 2:**
 
-   For ROS 2:
+```shell
+# Simulation-to-simulation (sim2sim): launches two simulators + keyboard teleop + force feedback node
+ros2 launch hex_ros_demo_arm_force_feedback sim2sim_force_feedback.launch.py \
+    viewer:=true rviz:=false
 
-   ```shell
-   ros2 launch hex_ros_sim_archer_y6 sim_archer_y6.launch.py
-   ros2 launch hex_ros_teleop_keyboard teleop_keyboard.launch.py
-   ```
+# Real-to-simulation (real2sim): master is real robot, slave is simulation
+ros2 launch hex_ros_demo_arm_force_feedback real2sim_force_feedback.launch.py \
+    master_robot_host:=<master_ip> master_robot_port:=8439 robot_grip_type:=gr100
 
-2. Launch the `arm_force_feedback` node:
+# Real-to-real (real2real): both master and slave are real robots
+ros2 launch hex_ros_demo_arm_force_feedback real2real_force_feedback.launch.py \
+    master_robot_host:=<master_ip> master_robot_port:=8439 \
+    slave_robot_host:=<slave_ip> slave_robot_port:=8439 robot_grip_type:=gr100
 
-   For ROS 1:
+# Start force feedback node only (requires separate arm state/control drivers)
+ros2 launch hex_ros_demo_arm_force_feedback arm_force_feedback.launch.py
+```
 
-   ```shell
-   roslaunch hex_ros_demo_arm_force_feedback arm_force_feedback.launch
-   ```
+**ROS 1:**
 
-   For ROS 2:
+```shell
+# Simulation-to-simulation (sim2sim)
+roslaunch hex_ros_demo_arm_force_feedback sim2sim_force_feedback.launch viewer:=true rviz:=false
 
-   ```shell
-   ros2 launch hex_ros_demo_arm_force_feedback arm_force_feedback.launch.py
-   ```
+# Start force feedback node only
+roslaunch hex_ros_demo_arm_force_feedback arm_force_feedback.launch
+```
 
-3. The arm moves to the stable pose and then enters impedance control. Press `q` to exit. To record data, use ROS's bag tools, e.g. `ros2 bag record -a`.
+> Ensure parameters in `config/` are correctly set. The URDF path is set automatically by the launch file.
+
+Keyboard control:
+
+- **`s`** — Start force feedback control
+- **`q`** — Stop force feedback control; arms return to home position and exit
