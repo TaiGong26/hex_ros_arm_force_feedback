@@ -47,7 +47,7 @@ def generate_launch_description():
     robot_grip_type_arg = DeclareLaunchArgument(
         name='robot_grip_type',
         default_value='empty',
-        choices=['gp80', 'empty'],
+        choices=['gp80', 'gr100', 'empty'],
         description='Grip type: gp80 (1-DoF) or empty (0-DoF)')
 
     # ------------------------------------------------------------------

@@ -12,7 +12,7 @@ import sys
 import time
 import traceback
 import threading
-from typing import Optional
+from typing import Optional,Tuple
 
 import numpy as np
 from hex_util_ros import part2se3, se32part
@@ -42,7 +42,7 @@ from TrajectoryController import Move2TargetPlanner
 ARM_DOF = 6
 GRIP_DOF = 1
 
-EXTRA_MASS = 0.1
+EXTRA_MASS = 0.0
 
 class ArmForceFeedback:
 
@@ -202,8 +202,8 @@ class ArmForceFeedback:
                 eff=np.ones(GRIP_DOF),
                 kp=self.__grip_stable_kp.copy(),
                 kd=self.__grip_stable_kd.copy(),
-                lim_vel=np.array([0.5]),
-                lim_acc=np.array([1.0]),
+                lim_vel=np.array([10.0]),
+                lim_acc=np.array([10.0]),
             ),
         )
         return HexDcRoboManipCtrl(arm_ctrl=arm_ctrl, grip_ctrl=grip_ctrl)
@@ -255,10 +255,16 @@ class ArmForceFeedback:
             arm_jnt_vel: Optional[np.ndarray] = None,
             grip_jnt_pos: Optional[np.ndarray] = None,
             grip_jnt_vel: Optional[np.ndarray] = None,
-            grip_jnt_eff: Optional[np.ndarray] = None) -> HexDcRoboManipCtrl:
+            grip_jnt_eff: Optional[np.ndarray] = None,
+            zero_mask:Optional[np.ndarray] = None
+            ) -> HexDcRoboManipCtrl:
         # MIT mode with master-side PD gains: the driver/sim adds the model
         # gravity + coriolis compensation (via `grav`), so the commanded
         # effort combines PD feedback with the compensation torque.
+        
+        arm_kp = self.__arm_master_kp.copy()
+        arm_kp[zero_mask]=0.0
+        
         arm_ctrl = HexDcRoboArmCtrl(
             ctrl_mode=HexDcRoboArmCtrlMode.MIT,
             grav=HexDcBaseVector3(
@@ -270,7 +276,7 @@ class ArmForceFeedback:
                 pos=np.asarray(arm_jnt_pos, dtype=np.float64) if arm_jnt_pos is not None else np.zeros(ARM_DOF),
                 vel=np.asarray(arm_jnt_vel, dtype=np.float64)  if arm_jnt_vel is not None else np.zeros(ARM_DOF),
                 eff=np.asarray(arm_jnt_eff, dtype=np.float64)  if arm_jnt_eff is not None else np.zeros(ARM_DOF),
-                kp=self.__arm_master_kp.copy(),
+                kp=arm_kp,
                 kd=self.__arm_master_kd.copy(),
                 lim_vel=np.zeros(ARM_DOF),
                 lim_acc=np.zeros(ARM_DOF),
@@ -467,20 +473,17 @@ class ArmForceFeedback:
 
 
             if master_pos is not None and slave_pos is not None and master_vel is not None:
-
                 try:
 
-                    master_target_pos = self.__compute_effective_target(master_pos, slave_pos,
+                    master_target_pos, zero_mask = self.__compute_effective_target(master_pos, slave_pos,
                         self.__arm_master_deadzone, self.__arm_master_clip)
                     
-                    slave_target_pos = self.__compute_effective_target(slave_pos, master_pos,
-                        self.__arm_slave_deadzone, self.__arm_slave_clip)
+                    slave_target_pos, _ = self.__compute_effective_target(slave_pos, master_pos,
+                        None, self.__arm_slave_clip)
 
                 except Exception:
                     traceback.print_exc()
                 
-                # self._logd(f"master_target_pos{master_target_pos}, slave_target_pos{slave_target_pos}")
-
                 #  Friction compensation
                 if master_pos.shape[0] == ARM_DOF and master_vel.shape[0] == ARM_DOF:
                     jac = self.__dyn_util.dynamic_params(
@@ -493,15 +496,14 @@ class ArmForceFeedback:
                         and grip_master_pos.shape[0] == GRIP_DOF
                         and grip_slave_pos.shape[0] == GRIP_DOF):
                     try:
-                        grip_master_target = self.__compute_effective_target(
+                        grip_master_target,_ = self.__compute_effective_target(
                             grip_master_pos, grip_slave_pos,
                             self.__grip_master_deadzone, self.__grip_master_clip)
-                        grip_slave_target = self.__compute_effective_target(
+                        grip_slave_target,_ = self.__compute_effective_target(
                             grip_slave_pos, grip_master_pos,
                             self.__grip_slave_deadzone, self.__grip_slave_clip)
                     except Exception:
                         traceback.print_exc()
-
 
                 # pub cmd
                 self.__data_interface.pub_slave_manip_ctrl(
@@ -520,6 +522,7 @@ class ArmForceFeedback:
                         arm_jnt_eff=extra_tau,
                         grip_jnt_pos=grip_master_target,
                         grip_jnt_vel=grip_slave_vel,
+                        zero_mask = zero_mask
                     )
                 )
                 
@@ -531,7 +534,7 @@ class ArmForceFeedback:
             target: np.ndarray, 
             deadzone:  Optional[np.ndarray], 
             clip_bound: Optional[np.ndarray] = None
-        ) -> np.ndarray:
+        ) -> Tuple[np.ndarray,np.ndarray]:
         """
         Apply deadzone compensation and saturation clipping.
     
@@ -546,15 +549,18 @@ class ArmForceFeedback:
         """
         e = target - current
         
+        zero_mask=np.zeros_like(e)
+        
         if deadzone is not None:
             e_abs = np.fabs(e)
             zero_mask = (e_abs <= deadzone)
             e[zero_mask] = 0.0
             e[~zero_mask] = e[~zero_mask] - np.sign(e[~zero_mask]) * deadzone[~zero_mask]
-        
+            
         if clip_bound is not None:
             e = np.clip(e, -clip_bound, clip_bound)
-        return current + e     
+            
+        return current + e , zero_mask
 
 
 def main():

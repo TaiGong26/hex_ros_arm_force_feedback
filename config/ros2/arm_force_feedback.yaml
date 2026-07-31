@@ -27,8 +27,8 @@ arm_force_feedback:
     grip_stable_kd: [0.5]
 
     # gains used for master feedback control
-    arm_master_kp: [30.0, 30.0, 30.0, 10.0, 5.0, 1.5]
-    arm_master_kd: [2.0, 2.0, 2.0, 2.1, 0.5, 0.5]
+    arm_master_kp: [50.0, 50.0, 50.0, 20.0, 5.0, 1.5]
+    arm_master_kd: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     grip_master_kp: [20.0]
     grip_master_kd: [0.0]
 
@@ -39,7 +39,7 @@ arm_force_feedback:
     grip_slave_kd: [10.0]
 
     # master deadzone: per-joint lower bound, error below threshold → zero [rad]
-    arm_master_deadzone: [0.1, 0.1, 0.1, 0.2, 0.10, 0.10]
+    arm_master_deadzone: [0.05, 0.05, 0.05, 0.1, 0.10, 0.10]
     # master error clip: per-joint upper bound, max compensated error [rad]
     arm_master_clip: [1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
 
