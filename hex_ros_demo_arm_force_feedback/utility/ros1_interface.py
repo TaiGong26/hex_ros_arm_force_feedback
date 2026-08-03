@@ -141,6 +141,8 @@ class DataInterface(InterfaceBase):
             list(rospy.get_param('~grip_slave_deadzone', [0.01])),
             "grip_slave_clip":
             list(rospy.get_param('~grip_slave_clip', [0.3])),
+            "extra_mass":
+            float(rospy.get_param('~extra_mass', 0.0)),
         }
 
         ### publisher

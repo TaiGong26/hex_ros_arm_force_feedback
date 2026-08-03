@@ -42,8 +42,6 @@ from TrajectoryController import Move2TargetPlanner
 ARM_DOF = 6
 GRIP_DOF = 1
 
-EXTRA_MASS = 0.0
-
 class ArmForceFeedback:
 
     def __init__(self):
@@ -71,7 +69,7 @@ class ArmForceFeedback:
         )
         
         self.__extra_force = -self.__dyn_util.get_gravity(
-        ) * EXTRA_MASS
+        ) * self.__force_feedback_param["extra_mass"]
         
         ### control presets
         self.__arm_start_pos = np.asarray(

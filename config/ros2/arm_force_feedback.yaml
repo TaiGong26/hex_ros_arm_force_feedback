@@ -1,7 +1,7 @@
 arm_force_feedback:
   ros__parameters:
     # impedance control work loop rate [hz]
-    rate_ros: 500.0
+    rate_ros: 1000.0
 
     # keyboard monitor rate [hz]
     rate_teleop: 100.0
@@ -57,3 +57,5 @@ arm_force_feedback:
     grip_slave_deadzone: [0.01]
     # grip slave error clip: max compensated error [rad]
     grip_slave_clip: [0.3]
+
+    extra_mass: 0.0

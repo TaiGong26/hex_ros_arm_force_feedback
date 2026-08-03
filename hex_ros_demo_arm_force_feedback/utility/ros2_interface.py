@@ -104,6 +104,7 @@ class DataInterface(InterfaceBase):
         self.__node.declare_parameter('grip_master_clip', [0.5])
         self.__node.declare_parameter('grip_slave_deadzone', [0.01])
         self.__node.declare_parameter('grip_slave_clip', [0.3])
+        self.__node.declare_parameter('extra_mass', 0.0)
 
         self._rate_param.update({
             "teleop":
@@ -166,6 +167,8 @@ class DataInterface(InterfaceBase):
             list(self.__node.get_parameter('grip_slave_deadzone').value),
             "grip_slave_clip":
             list(self.__node.get_parameter('grip_slave_clip').value),
+            "extra_mass":
+            float(self.__node.get_parameter('extra_mass').value),
         }
 
         ### publisher
