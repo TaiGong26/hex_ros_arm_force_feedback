@@ -6,7 +6,6 @@
 # Date  : 2026-06-30
 ################################################################
 
-from doctest import master
 import os
 import sys
 import time
@@ -15,11 +14,7 @@ import threading
 from typing import Optional,Tuple
 
 import numpy as np
-from hex_util_ros import part2se3, se32part
 
-scrpit_path = os.path.abspath(os.path.dirname(__file__))
-sys.path.append(scrpit_path)
-from sympy import false
 from utility import DataInterface
 
 from hex_util_msg.dataclass.dataclass_base import (
@@ -68,8 +63,7 @@ class ArmForceFeedback:
             gravity=self.__gravity,
         )
         
-        self.__extra_force = -self.__dyn_util.get_gravity(
-        ) * self.__force_feedback_param["extra_mass"]
+        self.__extra_force = -self.__dyn_util.get_gravity() * self.__force_feedback_param["extra_mass"]
         
         ### control presets
         self.__arm_start_pos = np.asarray(
@@ -128,9 +122,6 @@ class ArmForceFeedback:
         self.__teleop_thread = threading.Thread(target=self.__teleop_process)
         self.__teleop_dt = 1.0 / max(float(self.__rate_param["teleop"]), 1.0)
         
-        
-        self._logd = self.__data_interface.logd
-
     def __is_running(self):
         return self.__data_interface.ok() and not self.__stop_event.is_set()
 
@@ -326,7 +317,7 @@ class ArmForceFeedback:
         stable_pos = self.__arm_start_pos if is_start else self.__arm_end_pos
         duration = 3.5
 
-        
+        # Wait for data from both master and slave arms to arrive.
         master_state = self.__data_interface.get_master_manip_state(
             latest=True)
         while master_state is None and self.__data_interface.ok():
