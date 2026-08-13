@@ -13,6 +13,7 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
 from launch_ros.actions import PushRosNamespace
 from launch_ros.parameter_descriptions import ParameterValue
@@ -49,13 +50,22 @@ def generate_launch_description():
         default_value='empty',
         choices=['gp80', 'gr100', 'empty'],
         description='Grip type: gp80 (1-DoF) or empty (0-DoF)')
+    robot_type_arg = DeclareLaunchArgument(
+        name='robot_type',
+        default_value='archer',
+        choices=['archer', 'firefly'],
+        description='Robot arm type: archer or firefly')
+
+    # robot launch file name: "archer.launch.py" / "firefly.launch.py"
+    robot_launch_file = PythonExpression(
+        ['"', LaunchConfiguration('robot_type'), '.launch.py"'])
 
     # ------------------------------------------------------------------
     # Master robot (namespaced /master/*)
     # ------------------------------------------------------------------
     master_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            PathJoinSubstitution([arm_pkg_path, "archer.launch.py"])),
+            PathJoinSubstitution([arm_pkg_path, robot_launch_file])),
         launch_arguments={
             'robot_host': LaunchConfiguration('master_robot_host'),
             'robot_port': LaunchConfiguration('master_robot_port'),
@@ -69,7 +79,7 @@ def generate_launch_description():
     # ------------------------------------------------------------------
     slave_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            PathJoinSubstitution([arm_pkg_path, "archer.launch.py"])),
+            PathJoinSubstitution([arm_pkg_path, robot_launch_file])),
         launch_arguments={
             'robot_host': LaunchConfiguration('slave_robot_host'),
             'robot_port': LaunchConfiguration('slave_robot_port'),
@@ -121,6 +131,7 @@ def generate_launch_description():
         slave_robot_host_arg,
         slave_robot_port_arg,
         robot_grip_type_arg,
+        robot_type_arg,
         # master / slave robot instances
         GroupAction([PushRosNamespace('master'), master_launch]),
         GroupAction([PushRosNamespace('slave'), slave_launch]),

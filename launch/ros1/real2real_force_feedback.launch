@@ -1,0 +1,57 @@
+<!--#######################################-->
+<!-- Copyright (c) 2026  Dong Zhaorui.     -->
+<!-- All rights reserved.                  -->
+<!-- Author: Dong Zhaorui 847235539@qq.com -->
+<!-- Date  : 2026-08-13                    -->
+<!--#######################################-->
+
+<launch>
+    <arg name="master_robot_host" default="192.168.1.100"/>
+    <arg name="master_robot_port" default="8439"/>
+    <arg name="slave_robot_host" default="192.168.1.101"/>
+    <arg name="slave_robot_port" default="8439"/>
+    <arg name="robot_grip_type" default="empty"/>
+    <arg name="robot_type" default="archer"/>
+
+    <!-- master real driver (archer / firefly, selectable) -->
+    <group if="$(eval arg('robot_type') == 'archer')" ns="master">
+        <include file="$(find hex_ros_robot_arm)/launch/ros1/archer.launch">
+            <arg name="robot_host" value="$(arg master_robot_host)"/>
+            <arg name="robot_port" value="$(arg master_robot_port)"/>
+            <arg name="robot_grip_type" value="$(arg robot_grip_type)"/>
+            <arg name="test" value="false"/>
+        </include>
+    </group>
+    <group unless="$(eval arg('robot_type') == 'archer')" ns="master">
+        <include file="$(find hex_ros_robot_arm)/launch/ros1/firefly.launch">
+            <arg name="robot_host" value="$(arg master_robot_host)"/>
+            <arg name="robot_port" value="$(arg master_robot_port)"/>
+            <arg name="robot_grip_type" value="$(arg robot_grip_type)"/>
+            <arg name="test" value="false"/>
+        </include>
+    </group>
+
+    <!-- slave real driver (archer / firefly, selectable) -->
+    <group if="$(eval arg('robot_type') == 'archer')" ns="slave">
+        <include file="$(find hex_ros_robot_arm)/launch/ros1/archer.launch">
+            <arg name="robot_host" value="$(arg slave_robot_host)"/>
+            <arg name="robot_port" value="$(arg slave_robot_port)"/>
+            <arg name="robot_grip_type" value="$(arg robot_grip_type)"/>
+            <arg name="test" value="false"/>
+        </include>
+    </group>
+    <group unless="$(eval arg('robot_type') == 'archer')" ns="slave">
+        <include file="$(find hex_ros_robot_arm)/launch/ros1/firefly.launch">
+            <arg name="robot_host" value="$(arg slave_robot_host)"/>
+            <arg name="robot_port" value="$(arg slave_robot_port)"/>
+            <arg name="robot_grip_type" value="$(arg robot_grip_type)"/>
+            <arg name="test" value="false"/>
+        </include>
+    </group>
+
+    <!-- keyboard teleop -->
+    <include file="$(find hex_ros_teleop_keyboard)/launch/ros1/teleop_keyboard.launch"/>
+
+    <!-- force feedback control node (real: no use_sim_time) -->
+    <include file="$(find hex_ros_demo_arm_force_feedback)/launch/ros1/arm_force_feedback.launch"/>
+</launch>

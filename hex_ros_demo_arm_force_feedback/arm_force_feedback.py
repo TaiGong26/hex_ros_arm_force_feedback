@@ -422,7 +422,7 @@ class ArmForceFeedback:
 
         master_target_pos = slave_target_pos = None
 
-        # ★ grip 状态变量
+        # grip
         grip_master_pos = None
         grip_master_vel = None
         grip_slave_pos = None
@@ -440,7 +440,7 @@ class ArmForceFeedback:
                 master_pos = np.asarray(master_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 master_vel = np.asarray(master_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
 
-                # ★ grip state
+                # master grip state
                 try:
                     grip_master_pos = np.asarray(
                         master_state.manip_state.grip_state.jnt.position, dtype=np.float64)
@@ -458,7 +458,7 @@ class ArmForceFeedback:
                 slave_pos = np.asarray(slave_state.manip_state.arm_state.jnt.position, dtype=np.float64)
                 slave_vel = np.asarray(slave_state.manip_state.arm_state.jnt.velocity, dtype=np.float64)
 
-                # ★ grip state
+                # slave grip state
                 try:
                     grip_slave_pos = np.asarray(
                         slave_state.manip_state.grip_state.jnt.position, dtype=np.float64)
@@ -488,7 +488,7 @@ class ArmForceFeedback:
                             master_pos, master_vel, base_frame=True)[3][:3, :ARM_DOF]
                     extra_tau = jac.T @ self.__extra_force
 
-                # Grip  feedback
+                # Grip feedback
                 grip_master_target = grip_slave_target = None
                 if (grip_master_pos is not None and grip_slave_pos is not None
                         and grip_master_pos.shape[0] == GRIP_DOF

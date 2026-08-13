@@ -13,6 +13,7 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.substitutions import PathJoinSubstitution
+from launch.substitutions import PythonExpression
 from launch_ros.actions import Node
 from launch_ros.actions import PushRosNamespace
 from launch_ros.parameter_descriptions import ParameterValue
@@ -51,13 +52,22 @@ def generate_launch_description():
                                      default_value='false',
                                      choices=['true', 'false'],
                                      description='Flag to turn on rviz')
+    robot_type_arg = DeclareLaunchArgument(
+        name='robot_type',
+        default_value='archer',
+        choices=['archer', 'firefly'],
+        description='Robot arm type: archer or firefly')
+
+    # robot launch file name: "archer.launch.py" / "firefly.launch.py"
+    robot_launch_file = PythonExpression(
+        ['"', LaunchConfiguration('robot_type'), '.launch.py"'])
 
     # ------------------------------------------------------------------
     # Master robot (real, namespaced /master/*)
     # ------------------------------------------------------------------
     master_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
-            PathJoinSubstitution([arm_pkg_path, "archer.launch.py"])),
+            PathJoinSubstitution([arm_pkg_path, robot_launch_file])),
         launch_arguments={
             'robot_host': LaunchConfiguration('master_robot_host'),
             'robot_port': LaunchConfiguration('master_robot_port'),
@@ -121,6 +131,7 @@ def generate_launch_description():
         master_robot_host_arg,
         master_robot_port_arg,
         robot_grip_type_arg,
+        robot_type_arg,
         viewer_arg,
         rviz_arg,
         # master (real) / slave (sim) instances
